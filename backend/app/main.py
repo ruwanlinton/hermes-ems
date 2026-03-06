@@ -43,3 +43,4 @@ app.include_router(results.router, prefix=prefix, tags=["results"])
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+

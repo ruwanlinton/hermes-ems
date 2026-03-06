@@ -39,14 +39,15 @@ HEADER_LEFT_MM = 25.0
 HEADER_RIGHT_MM = PAGE_W_MM - 25.0
 
 # --- Bubble grid parameters ---
-BUBBLE_DIAMETER_MM = 7.0
-BUBBLE_SPACING_MM = 10.0   # center-to-center spacing
+BUBBLE_DIAMETER_MM = 4.5
+BUBBLE_SPACING_MM = 7.0   # center-to-center spacing
 
 # Section A (Type 1: single best answer A-E)
 SECTION_A_TOP_MM = 90.0
 SECTION_A_LEFT_MM = 25.0
-SECTION_A_COL2_LEFT_MM = 115.0  # x start of second column
-SECTION_A_ROW_HEIGHT_MM = 10.0
+SECTION_A_COL2_LEFT_MM = 78.0   # x start of second column
+SECTION_A_COL3_LEFT_MM = 131.0  # x start of third column
+SECTION_A_ROW_HEIGHT_MM = 9.0
 OPTIONS_TYPE1 = ["A", "B", "C", "D", "E"]
 
 # Section B (Type 2: True/False per sub-option A-E)

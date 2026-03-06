@@ -11,7 +11,6 @@ from sqlalchemy import select
 from app.config import get_settings
 from app.db.session import get_db
 from app.db.models import User
-
 bearer_scheme = HTTPBearer()
 settings = get_settings()
 

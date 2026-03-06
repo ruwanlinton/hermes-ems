@@ -5,7 +5,7 @@ from typing import Optional
 
 from app.pdf.layout_constants import (
     BUBBLE_DIAMETER_MM, BUBBLE_SPACING_MM,
-    SECTION_A_TOP_MM, SECTION_A_LEFT_MM, SECTION_A_COL2_LEFT_MM, SECTION_A_ROW_HEIGHT_MM,
+    SECTION_A_TOP_MM, SECTION_A_LEFT_MM, SECTION_A_COL2_LEFT_MM, SECTION_A_COL3_LEFT_MM, SECTION_A_ROW_HEIGHT_MM,
     SECTION_B_LEFT_MM, SECTION_B_COL2_LEFT_MM, SECTION_B_BLOCK_HEIGHT_MM,
     OPTIONS_TYPE1, OPTIONS_TYPE2, SECTION_B_ROW_LABELS,
     mm_to_px,
@@ -42,22 +42,27 @@ def detect_type1_answers(
     img_gray: np.ndarray,
     type1_questions: list[dict],
     fill_threshold: float = 0.50,
-    questions_per_col: int = 30,
 ) -> dict[str, Optional[str]]:
     """
-    Detect filled bubbles for Type 1 questions.
+    Detect filled bubbles for Type 1 questions (3-column layout).
     Returns {question_number_str: selected_option or None}.
     """
+    import math
+
+    if not type1_questions:
+        return {}
+
     r_px = mm_to_px(BUBBLE_DIAMETER_MM / 2)
-    col_starts = [SECTION_A_LEFT_MM, SECTION_A_COL2_LEFT_MM]
+    questions_per_col = math.ceil(len(type1_questions) / 3)
+    col_starts = [SECTION_A_LEFT_MM, SECTION_A_COL2_LEFT_MM, SECTION_A_COL3_LEFT_MM]
     answers = {}
 
     for i, q in enumerate(type1_questions):
-        col = 0 if i < questions_per_col else 1
-        row = i if i < questions_per_col else i - questions_per_col
+        col = min(i // questions_per_col, 2)
+        row = i % questions_per_col
 
         x_start = col_starts[col]
-        cy_mm = SECTION_A_TOP_MM + 5 + row * SECTION_A_ROW_HEIGHT_MM
+        cy_mm = SECTION_A_TOP_MM + 8 + row * SECTION_A_ROW_HEIGHT_MM
         cy_px = mm_to_px(cy_mm)
 
         filled = []

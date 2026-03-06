@@ -8,6 +8,7 @@ from typing import Optional
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib import colors
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 import qrcode
 from PIL import Image
@@ -17,7 +18,7 @@ from .layout_constants import (
     QR_SIZE_MM, QR_TOP_MM, QR_LEFT_MM,
     HEADER_TOP_MM, HEADER_LEFT_MM, HEADER_RIGHT_MM,
     BUBBLE_DIAMETER_MM, BUBBLE_SPACING_MM,
-    SECTION_A_TOP_MM, SECTION_A_LEFT_MM, SECTION_A_COL2_LEFT_MM, SECTION_A_ROW_HEIGHT_MM,
+    SECTION_A_TOP_MM, SECTION_A_LEFT_MM, SECTION_A_COL2_LEFT_MM, SECTION_A_COL3_LEFT_MM, SECTION_A_ROW_HEIGHT_MM,
     SECTION_B_LEFT_MM, SECTION_B_COL2_LEFT_MM, SECTION_B_BLOCK_HEIGHT_MM,
     SECTION_B_ROW_LABELS, OPTIONS_TYPE1, OPTIONS_TYPE2,
     PAGE_H_MM,
@@ -70,7 +71,7 @@ def _draw_qr(c: canvas.Canvas, exam_id: str, index_number: str) -> None:
     y_pt = _y(QR_TOP_MM + QR_SIZE_MM)
     size_pt = _mm_to_pt(QR_SIZE_MM)
     c.drawImage(
-        buf,  # type: ignore[arg-type]
+        ImageReader(buf),
         x_pt, y_pt, width=size_pt, height=size_pt,
         preserveAspectRatio=True,
     )
@@ -117,9 +118,10 @@ def _draw_bubble(c: canvas.Canvas, cx_mm: float, cy_mm: float, filled: bool = Fa
 def _draw_section_a(
     c: canvas.Canvas,
     type1_questions: list[dict],
-    questions_per_col: int = 30,
 ) -> float:
-    """Draw Type 1 bubble grid. Returns the y_mm below the last row."""
+    """Draw Type 1 bubble grid in 3 columns. Returns the y_mm below the last row."""
+    import math
+
     c.setFont("Helvetica-Bold", 10)
     c.drawString(
         _mm_to_pt(SECTION_A_LEFT_MM),
@@ -127,38 +129,48 @@ def _draw_section_a(
         "SECTION A — Single Best Answer (circle ONE option per question)",
     )
 
-    col_starts = [SECTION_A_LEFT_MM, SECTION_A_COL2_LEFT_MM]
+    if not type1_questions:
+        return SECTION_A_TOP_MM + 10
+
+    questions_per_col = math.ceil(len(type1_questions) / 3)
+    col_starts = [SECTION_A_LEFT_MM, SECTION_A_COL2_LEFT_MM, SECTION_A_COL3_LEFT_MM]
     row_h = SECTION_A_ROW_HEIGHT_MM
     bubble_r = BUBBLE_DIAMETER_MM / 2
     options = OPTIONS_TYPE1
 
+    # Draw A-E column headers once per column
+    header_y_mm = SECTION_A_TOP_MM + 3
+    for col_x in col_starts:
+        for j, opt in enumerate(options):
+            cx = col_x + 10 + j * BUBBLE_SPACING_MM
+            c.setFont("Helvetica-Bold", 7)
+            c.drawCentredString(_mm_to_pt(cx), _y(header_y_mm), opt)
+
     max_y_mm = SECTION_A_TOP_MM
 
     for i, q in enumerate(type1_questions):
-        col = 0 if i < questions_per_col else 1
-        row = i if i < questions_per_col else i - questions_per_col
+        col = min(i // questions_per_col, 2)
+        row = i % questions_per_col
 
         x_start = col_starts[col]
-        y_center = SECTION_A_TOP_MM + 5 + row * row_h
+        y_center = SECTION_A_TOP_MM + 8 + row * row_h
 
         if y_center > max_y_mm:
             max_y_mm = y_center
 
         # Question number label
-        c.setFont("Helvetica", 8)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
         c.drawRightString(
             _mm_to_pt(x_start + 6),
-            _y(y_center + bubble_r),
-            f"Q{q['question_number']}",
+            _y(y_center + 1.5),
+            f"{int(q['question_number']):02d}.",
         )
 
         # Bubbles A-E
-        for j, opt in enumerate(options):
+        for j in range(len(options)):
             cx = x_start + 10 + j * BUBBLE_SPACING_MM
             _draw_bubble(c, cx, y_center)
-            # Option label above bubble
-            c.setFont("Helvetica", 6)
-            c.drawCentredString(_mm_to_pt(cx), _y(y_center - bubble_r - 2), opt)
 
     return max_y_mm + row_h + 5
 
