@@ -1,0 +1,39 @@
+apiVersion: core.choreo.dev/v1beta1
+kind: Component
+metadata:
+  name: slmc-omr-backend
+  description: SLMC OMR FastAPI backend service
+spec:
+  type: service
+  source:
+    type: dockerfile
+    dockerfile: Dockerfile
+    context: .
+  endpoints:
+    - name: api
+      port: 8000
+      type: REST
+      networkVisibility: Public
+      schemaFilePath: ""
+  env:
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: slmc-omr-secrets
+          key: DATABASE_URL
+    - name: ASGARDEO_BASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: slmc-omr-secrets
+          key: ASGARDEO_BASE_URL
+    - name: JWT_AUDIENCE
+      valueFrom:
+        secretKeyRef:
+          name: slmc-omr-secrets
+          key: JWT_AUDIENCE
+    - name: UPLOAD_DIR
+      value: /tmp/slmc_uploads
+    - name: FILL_THRESHOLD
+      value: "0.50"
+    - name: CORS_ORIGINS
+      value: '[]'

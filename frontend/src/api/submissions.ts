@@ -1,0 +1,53 @@
+import { apiClient } from "./client";
+
+export interface Submission {
+  id: string;
+  exam_id: string;
+  index_number: string | null;
+  status: string;
+  raw_answers: Record<string, unknown> | null;
+  error_stage: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BatchResult {
+  filename: string;
+  submission_id?: string;
+  status: string;
+  index_number?: string;
+  error_stage?: string;
+  error_message?: string;
+}
+
+export const submissionsApi = {
+  upload: (examId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiClient.post<Submission>(`/exams/${examId}/submissions`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  batchUpload: (examId: string, files: File[]) => {
+    const form = new FormData();
+    for (const f of files) form.append("files", f);
+    return apiClient.post<{ results: BatchResult[] }>(
+      `/exams/${examId}/submissions/batch`,
+      form,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+  },
+
+  list: (examId: string) =>
+    apiClient.get<Submission[]>(`/exams/${examId}/submissions`),
+
+  get: (examId: string, submissionId: string) =>
+    apiClient.get<Submission>(`/exams/${examId}/submissions/${submissionId}`),
+
+  reprocess: (examId: string, submissionId: string) =>
+    apiClient.post<Submission>(
+      `/exams/${examId}/submissions/${submissionId}/reprocess`
+    ),
+};

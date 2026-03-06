@@ -1,0 +1,32 @@
+apiVersion: core.choreo.dev/v1beta1
+kind: Component
+metadata:
+  name: slmc-omr-frontend
+  description: SLMC OMR React web application
+spec:
+  type: webApplication
+  source:
+    type: dockerfile
+    dockerfile: Dockerfile
+    context: .
+  endpoints:
+    - name: web
+      port: 8080
+      type: HTTP
+      networkVisibility: Public
+  env:
+    - name: VITE_ASGARDEO_CLIENT_ID
+      valueFrom:
+        secretKeyRef:
+          name: slmc-omr-frontend-secrets
+          key: VITE_ASGARDEO_CLIENT_ID
+    - name: VITE_ASGARDEO_BASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: slmc-omr-frontend-secrets
+          key: VITE_ASGARDEO_BASE_URL
+    - name: VITE_API_BASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: slmc-omr-frontend-secrets
+          key: VITE_API_BASE_URL

@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: slmc
+      POSTGRES_PASSWORD: slmc
+      POSTGRES_DB: slmc_omr
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U slmc -d slmc_omr"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://slmc:slmc@postgres:5432/slmc_omr
+      ASGARDEO_BASE_URL: ${ASGARDEO_BASE_URL:-https://api.asgardeo.io/t/your-org}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-your-client-id}
+      UPLOAD_DIR: /tmp/slmc_uploads
+      FILL_THRESHOLD: "0.50"
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - uploads:/tmp/slmc_uploads
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:8080"
+    environment:
+      VITE_ASGARDEO_CLIENT_ID: ${VITE_ASGARDEO_CLIENT_ID:-}
+      VITE_ASGARDEO_BASE_URL: ${VITE_ASGARDEO_BASE_URL:-}
+      VITE_API_BASE_URL: http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  uploads:
