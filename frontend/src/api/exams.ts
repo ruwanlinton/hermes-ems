@@ -59,9 +59,15 @@ export const examsApi = {
   ) => apiClient.post<AnswerKey[]>(`/exams/${examId}/answer-key`, { answers }),
 
   generateSheets: (examId: string, idMode: string, csvFile?: File) => {
-    const form = new FormData();
-    if (csvFile) form.append("csv_file", csvFile);
-    return apiClient.post(`/exams/${examId}/sheets/generate?id_mode=${idMode}`, form, {
+    if (csvFile) {
+      const form = new FormData();
+      form.append("csv_file", csvFile);
+      return apiClient.post(`/exams/${examId}/sheets/generate?id_mode=${idMode}`, form, {
+        headers: { "Content-Type": undefined },
+        responseType: "blob",
+      });
+    }
+    return apiClient.post(`/exams/${examId}/sheets/generate?id_mode=${idMode}`, null, {
       responseType: "blob",
     });
   },
