@@ -62,6 +62,7 @@ async def process_submission(
     submission: Submission,
     db: AsyncSession,
     fill_threshold: Optional[float] = None,
+    digit_count: int = 8,
 ) -> Submission:
     """
     Run the full OMR pipeline for a single submission.
@@ -98,7 +99,7 @@ async def process_submission(
             img_pre = img
         import cv2 as _cv2
         gray_pre = _cv2.cvtColor(img_pre, _cv2.COLOR_BGR2GRAY)
-        index_number = detect_digit_grid(gray_pre, fill_threshold=threshold)
+        index_number = detect_digit_grid(gray_pre, fill_threshold=threshold, n_digits=digit_count)
         if not index_number:
             return await _fail(
                 "qr_decode",

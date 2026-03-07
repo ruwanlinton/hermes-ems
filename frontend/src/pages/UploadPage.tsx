@@ -14,6 +14,7 @@ export function UploadPage() {
   const { id } = useParams<{ id: string }>();
   const [files, setFiles] = useState<FileStatus[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [digitCount, setDigitCount] = useState(8);
 
   const handleFiles = (newFiles: File[]) => {
     setFiles((prev) => [
@@ -35,7 +36,7 @@ export function UploadPage() {
         prev.map((f) => f.file === item.file ? { ...f, status: "uploading" } : f)
       );
       try {
-        const res = await submissionsApi.upload(id, item.file);
+        const res = await submissionsApi.upload(id, item.file, digitCount);
         setFiles((prev) =>
           prev.map((f) =>
             f.file === item.file
@@ -69,7 +70,7 @@ export function UploadPage() {
         prev.map((f) => f.status === "pending" ? { ...f, status: "uploading" } : f)
       );
       try {
-        const res = await submissionsApi.batchUpload(id, pending.map((f) => f.file));
+        const res = await submissionsApi.batchUpload(id, pending.map((f) => f.file), digitCount);
         const resultMap = new Map(res.data.results.map((r) => [r.filename, r]));
         setFiles((prev) =>
           prev.map((f) => {
@@ -101,6 +102,21 @@ export function UploadPage() {
   return (
     <Layout>
       <h1 style={styles.h1}>Upload OMR Sheets</h1>
+
+      <div style={styles.settingsRow}>
+        <label style={styles.digitLabel}>
+          Index digit columns (bubble grid sheets):
+          <input
+            type="number"
+            min={1}
+            max={10}
+            value={digitCount}
+            onChange={(e) => setDigitCount(Math.min(10, Math.max(1, Number(e.target.value))))}
+            style={styles.digitInput}
+          />
+        </label>
+        <span style={styles.digitHint}>Must match the digit count used when generating the sheets. Use 8 for QR-coded sheets.</span>
+      </div>
 
       <div style={styles.dropArea}>
         <DropZone onFiles={handleFiles} multiple />
@@ -159,6 +175,10 @@ function statusStyle(status: string): React.CSSProperties {
 
 const styles: Record<string, React.CSSProperties> = {
   h1: { fontSize: 22, fontWeight: 700, color: "#1a365d", marginBottom: 24 },
+  settingsRow: { background: "#fff", borderRadius: 8, padding: "14px 20px", marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" as const },
+  digitLabel: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "#2d3748" },
+  digitInput: { width: 56, padding: "4px 8px", border: "1px solid #cbd5e0", borderRadius: 4, fontSize: 14, textAlign: "center" as const, marginLeft: 4 },
+  digitHint: { fontSize: 12, color: "#718096" },
   dropArea: { marginBottom: 24 },
   fileList: { background: "#fff", borderRadius: 8, padding: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.08)" },
   fileListHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },

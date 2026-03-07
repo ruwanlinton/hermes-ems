@@ -1,7 +1,7 @@
 import os
 import uuid
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -41,6 +41,7 @@ async def _save_image(image_bytes: bytes, exam_id: str) -> str:
 async def upload_submission(
     exam_id: str,
     file: UploadFile = File(...),
+    digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in the bubble grid (for bubble_grid id sheets)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -66,7 +67,7 @@ async def upload_submission(
     await db.refresh(submission)
 
     # Process synchronously for single upload
-    submission = await process_submission(image_bytes, exam_id, submission, db)
+    submission = await process_submission(image_bytes, exam_id, submission, db, digit_count=digit_count)
     return submission
 
 
@@ -74,6 +75,7 @@ async def upload_submission(
 async def batch_upload_submissions(
     exam_id: str,
     files: List[UploadFile] = File(...),
+    digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in the bubble grid (for bubble_grid id sheets)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -102,7 +104,7 @@ async def batch_upload_submissions(
         await db.commit()
         await db.refresh(submission)
 
-        submission = await process_submission(image_bytes, exam_id, submission, db)
+        submission = await process_submission(image_bytes, exam_id, submission, db, digit_count=digit_count)
         results.append({
             "filename": file.filename,
             "submission_id": submission.id,
@@ -152,6 +154,7 @@ async def get_submission(
 async def reprocess_submission(
     exam_id: str,
     submission_id: str,
+    digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in the bubble grid (for bubble_grid id sheets)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -176,5 +179,5 @@ async def reprocess_submission(
     sub.error_message = None
     await db.commit()
 
-    sub = await process_submission(image_bytes, exam_id, sub, db)
+    sub = await process_submission(image_bytes, exam_id, sub, db, digit_count=digit_count)
     return sub
