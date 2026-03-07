@@ -24,7 +24,8 @@ from .layout_constants import (
     SECTION_B_ROW_LABELS, OPTIONS_TYPE1, OPTIONS_TYPE2,
     PAGE_H_MM,
     ID_GRID_DIGIT_COUNT, ID_GRID_BUBBLE_DIAMETER_MM, ID_GRID_CELL_H_MM, ID_GRID_CELL_W_MM,
-    ID_GRID_LABEL_W_MM, ID_GRID_HEADER_H_MM, ID_GRID_TOP_MM, ID_GRID_LEFT_MM,
+    ID_GRID_LABEL_W_MM, ID_GRID_LABEL_GAP_MM, ID_GRID_HEADER_H_MM, ID_GRID_HEADER_GAP_MM,
+    ID_GRID_TOP_MM, ID_GRID_LEFT_MM,
 )
 
 PAGE_WIDTH, PAGE_HEIGHT = A4  # in points
@@ -95,14 +96,14 @@ def _draw_id_digit_grid(c: canvas.Canvas) -> None:
 
     # Column-position headers (1, 2, … n)
     for col in range(n):
-        cx_mm = x0 + ID_GRID_LABEL_W_MM + col * ID_GRID_CELL_W_MM
+        cx_mm = x0 + ID_GRID_LABEL_W_MM + ID_GRID_LABEL_GAP_MM + col * ID_GRID_CELL_W_MM
         c.setFillColor(colors.black)
         c.setFont("Helvetica-Bold", 6)
         c.drawCentredString(_mm_to_pt(cx_mm), _y(y0 + ID_GRID_HEADER_H_MM - 1), str(col + 1))
 
     # Rows 0–9
     for row in range(10):
-        cy_mm = y0 + ID_GRID_HEADER_H_MM + row * ID_GRID_CELL_H_MM
+        cy_mm = y0 + ID_GRID_HEADER_H_MM + ID_GRID_HEADER_GAP_MM + row * ID_GRID_CELL_H_MM
 
         # Digit label
         c.setFillColor(colors.black)
@@ -111,35 +112,58 @@ def _draw_id_digit_grid(c: canvas.Canvas) -> None:
 
         # Bubbles for each digit position
         for col in range(n):
-            cx_mm = x0 + ID_GRID_LABEL_W_MM + col * ID_GRID_CELL_W_MM
+            cx_mm = x0 + ID_GRID_LABEL_W_MM + ID_GRID_LABEL_GAP_MM + col * ID_GRID_CELL_W_MM
             c.setFillColor(colors.white)
             c.setStrokeColor(colors.black)
             c.setLineWidth(0.4)
             c.circle(_mm_to_pt(cx_mm), _y(cy_mm), r_pt, stroke=1, fill=0)
 
 
-def _draw_header(c: canvas.Canvas, exam_title: str, index_number: str, exam_date: str) -> None:
+def _draw_header(
+    c: canvas.Canvas,
+    exam_title: str,
+    index_number: str,
+    exam_date: str,
+    grid_mode: bool = False,
+) -> None:
     c.setFillColor(colors.black)
-    c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(
-        PAGE_WIDTH / 2,
-        _y(HEADER_TOP_MM),
-        "SRI LANKA MEDICAL COUNCIL",
-    )
-    c.setFont("Helvetica-Bold", 11)
-    c.drawCentredString(PAGE_WIDTH / 2, _y(HEADER_TOP_MM + 7), exam_title)
 
-    c.setFont("Helvetica", 10)
-    y_detail = _y(HEADER_TOP_MM + 14)
-    c.drawString(_mm_to_pt(HEADER_LEFT_MM), y_detail, f"Index No: {index_number}")
-    c.drawString(_mm_to_pt(120), y_detail, f"Date: {exam_date}")
+    if grid_mode:
+        # Left-pane layout: text in x=25–125mm, same vertical band as the digit grid
+        left_x = _mm_to_pt(HEADER_LEFT_MM)
+        center_x = _mm_to_pt(75)  # centre of left pane (25–125mm)
+        top_y = ID_GRID_TOP_MM
 
-    # Horizontal separator
-    c.setLineWidth(0.5)
-    c.line(
-        _mm_to_pt(HEADER_LEFT_MM), _y(HEADER_TOP_MM + 20),
-        _mm_to_pt(HEADER_RIGHT_MM), _y(HEADER_TOP_MM + 20),
-    )
+        c.setFont("Helvetica-Bold", 11)
+        c.drawCentredString(center_x, _y(top_y + 5), "SRI LANKA MEDICAL COUNCIL")
+        c.setFont("Helvetica-Bold", 9)
+        c.drawCentredString(center_x, _y(top_y + 13), exam_title)
+        c.setFont("Helvetica", 8)
+        c.drawCentredString(center_x, _y(top_y + 21), f"Date: {exam_date}")
+        c.setFont("Helvetica-Oblique", 7)
+        c.drawCentredString(center_x, _y(top_y + 32), "Fill all digit positions in the grid")
+
+        # Separator below both left pane and grid (grid bottom ≈ top+45mm)
+        sep_y = top_y + 45
+        c.setLineWidth(0.5)
+        c.line(_mm_to_pt(HEADER_LEFT_MM), _y(sep_y), _mm_to_pt(HEADER_RIGHT_MM), _y(sep_y))
+    else:
+        c.setFont("Helvetica-Bold", 14)
+        c.drawCentredString(PAGE_WIDTH / 2, _y(HEADER_TOP_MM), "SRI LANKA MEDICAL COUNCIL")
+        c.setFont("Helvetica-Bold", 11)
+        c.drawCentredString(PAGE_WIDTH / 2, _y(HEADER_TOP_MM + 7), exam_title)
+
+        c.setFont("Helvetica", 10)
+        y_detail = _y(HEADER_TOP_MM + 14)
+        c.drawString(_mm_to_pt(HEADER_LEFT_MM), y_detail, f"Index No: {index_number}")
+        c.drawString(_mm_to_pt(120), y_detail, f"Date: {exam_date}")
+
+        # Horizontal separator
+        c.setLineWidth(0.5)
+        c.line(
+            _mm_to_pt(HEADER_LEFT_MM), _y(HEADER_TOP_MM + 20),
+            _mm_to_pt(HEADER_RIGHT_MM), _y(HEADER_TOP_MM + 20),
+        )
 
 
 def _draw_bubble(c: canvas.Canvas, cx_mm: float, cy_mm: float, filled: bool = False) -> None:
@@ -333,8 +357,8 @@ def generate_sheet(
     elif id_mode == "bubble_grid":
         _draw_id_digit_grid(c)
 
-    header_index = index_number if id_mode != "bubble_grid" else "_______________"
-    _draw_header(c, exam_title, header_index, exam_date)
+    header_index = index_number if id_mode != "bubble_grid" else ""
+    _draw_header(c, exam_title, header_index, exam_date, grid_mode=(id_mode == "bubble_grid"))
 
     y_after_a = _draw_section_a(c, type1_questions)
 
@@ -381,8 +405,8 @@ def generate_batch_pdf(
         elif id_mode == "bubble_grid":
             _draw_id_digit_grid(c)
 
-        header_index = index_number if id_mode != "bubble_grid" else "_______________"
-        _draw_header(c, exam_title, header_index, exam_date)
+        header_index = index_number if id_mode != "bubble_grid" else ""
+        _draw_header(c, exam_title, header_index, exam_date, grid_mode=(id_mode == "bubble_grid"))
 
         y_after_a = _draw_section_a(c, type1_questions)
         if type2_questions:

@@ -43,7 +43,9 @@ ID_GRID_BUBBLE_DIAMETER_MM = 2.5
 ID_GRID_CELL_H_MM = 3.5       # row center-to-center spacing
 ID_GRID_CELL_W_MM = 4.0       # column center-to-center spacing
 ID_GRID_LABEL_W_MM = 6.0      # width of the "0"–"9" label column on the left
+ID_GRID_LABEL_GAP_MM = 1.5   # horizontal gap between digit label and first bubble column
 ID_GRID_HEADER_H_MM = 5.0     # height of the column-number header row
+ID_GRID_HEADER_GAP_MM = 1.5  # vertical gap between column-number header and first bubble row
 ID_GRID_TOP_MM = 20.0         # y of grid top from page top
 ID_GRID_LEFT_MM = 135.0       # x of grid left edge (right side, all grid modes)
 

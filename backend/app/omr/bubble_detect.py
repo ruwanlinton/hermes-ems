@@ -10,7 +10,8 @@ from app.pdf.layout_constants import (
     SECTION_B_BUBBLE_DIAMETER_MM, SECTION_B_BUBBLE_SPACING_MM,
     OPTIONS_TYPE1, OPTIONS_TYPE2, SECTION_B_ROW_LABELS,
     ID_GRID_DIGIT_COUNT, ID_GRID_BUBBLE_DIAMETER_MM, ID_GRID_CELL_H_MM, ID_GRID_CELL_W_MM,
-    ID_GRID_LABEL_W_MM, ID_GRID_HEADER_H_MM, ID_GRID_TOP_MM, ID_GRID_LEFT_MM,
+    ID_GRID_LABEL_W_MM, ID_GRID_LABEL_GAP_MM, ID_GRID_HEADER_H_MM, ID_GRID_HEADER_GAP_MM,
+    ID_GRID_TOP_MM, ID_GRID_LEFT_MM,
     mm_to_px,
 )
 
@@ -157,14 +158,14 @@ def detect_digit_grid(
     digits = []
 
     for col in range(ID_GRID_DIGIT_COUNT):
-        cx_mm = ID_GRID_LEFT_MM + ID_GRID_LABEL_W_MM + col * ID_GRID_CELL_W_MM
+        cx_mm = ID_GRID_LEFT_MM + ID_GRID_LABEL_W_MM + ID_GRID_LABEL_GAP_MM + col * ID_GRID_CELL_W_MM
         cx_px = mm_to_px(cx_mm)
 
         best_digit = None
         best_ratio = fill_threshold  # must exceed threshold to count
 
         for row in range(10):
-            cy_mm = ID_GRID_TOP_MM + ID_GRID_HEADER_H_MM + row * ID_GRID_CELL_H_MM
+            cy_mm = ID_GRID_TOP_MM + ID_GRID_HEADER_H_MM + ID_GRID_HEADER_GAP_MM + row * ID_GRID_CELL_H_MM
             cy_px = mm_to_px(cy_mm)
             ratio = _fill_ratio(img_gray, cx_px, cy_px, r_px)
             if ratio > best_ratio:
