@@ -31,7 +31,9 @@ export function Navbar() {
         <Link to="/settings" style={styles.link}>Settings</Link>
       </div>
       <div style={styles.user}>
-        {state.username && <span style={styles.username}>{state.username}</span>}
+        {(state.displayName || state.username) && (
+          <span style={styles.username}>{state.displayName || state.username}</span>
+        )}
         <button onClick={handleSignOut} style={styles.signOutBtn}>Sign Out</button>
       </div>
     </nav>
