@@ -1,9 +1,21 @@
 import { useAuthContext } from "@asgardeo/auth-react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 export function Navbar() {
-  const { state, signOut } = useAuthContext();
+  const { state, signOut, getBasicUserInfo } = useAuthContext();
   const navigate = useNavigate();
+  const [displayName, setDisplayName] = useState<string>("");
+
+  useEffect(() => {
+    if (state.isAuthenticated) {
+      getBasicUserInfo().then((info) => {
+        setDisplayName(info.displayName || info.givenName || info.username || "");
+      }).catch(() => {
+        setDisplayName(state.username || "");
+      });
+    }
+  }, [state.isAuthenticated]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -31,9 +43,7 @@ export function Navbar() {
         <Link to="/settings" style={styles.link}>Settings</Link>
       </div>
       <div style={styles.user}>
-        {(state.displayName || state.username) && (
-          <span style={styles.username}>{state.displayName || state.username}</span>
-        )}
+        {displayName && <span style={styles.username}>{displayName}</span>}
         <button onClick={handleSignOut} style={styles.signOutBtn}>Sign Out</button>
       </div>
     </nav>
