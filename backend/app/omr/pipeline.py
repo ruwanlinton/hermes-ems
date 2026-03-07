@@ -123,11 +123,18 @@ async def process_submission(
     type1_qs = [q for q in questions_list if q["question_type"] == "type1"]
     type2_qs = [q for q in questions_list if q["question_type"] == "type2"]
 
-    # Estimate section B top based on number of type1 questions (3-column layout)
+    # Compute section B top to match _draw_section_a's return value exactly:
+    #   return max_y_mm + row_h + 5
+    #   = SECTION_A_TOP_MM + 8 + (qpc-1)*row_h + row_h + 5
+    #   = SECTION_A_TOP_MM + 13 + qpc * row_h
+    # When type1 is empty, _draw_section_a returns SECTION_A_TOP_MM directly.
     import math
-    questions_per_col = math.ceil(len(type1_qs) / 3) if type1_qs else 0
     from app.pdf.layout_constants import SECTION_A_TOP_MM, SECTION_A_ROW_HEIGHT_MM
-    section_b_top = SECTION_A_TOP_MM + 8 + questions_per_col * SECTION_A_ROW_HEIGHT_MM + 10
+    if type1_qs:
+        questions_per_col = math.ceil(len(type1_qs) / 3)
+        section_b_top = SECTION_A_TOP_MM + 13 + questions_per_col * SECTION_A_ROW_HEIGHT_MM
+    else:
+        section_b_top = SECTION_A_TOP_MM
 
     try:
         raw_answers = detect_all_answers(
