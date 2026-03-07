@@ -119,6 +119,24 @@ def _draw_id_digit_grid(c: canvas.Canvas) -> None:
             c.circle(_mm_to_pt(cx_mm), _y(cy_mm), r_pt, stroke=1, fill=0)
 
 
+def _wrap_text(text: str, max_chars: int = 50) -> list[str]:
+    """Break text into lines of at most max_chars, splitting at word boundaries."""
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}" if current else word
+        if len(candidate) <= max_chars:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines or [text]
+
+
 def _draw_header(
     c: canvas.Canvas,
     exam_title: str,
@@ -128,41 +146,47 @@ def _draw_header(
 ) -> None:
     c.setFillColor(colors.black)
 
+    title_lines = _wrap_text(exam_title)
+    title_line_h_mm = 5.0  # vertical spacing between wrapped title lines
+
     if grid_mode:
-        # Left-pane layout: text in x=25–125mm, same vertical band as the digit grid
-        left_x = _mm_to_pt(HEADER_LEFT_MM)
         center_x = _mm_to_pt(75)  # centre of left pane (25–125mm)
         top_y = ID_GRID_TOP_MM
 
         c.setFont("Helvetica-Bold", 11)
         c.drawCentredString(center_x, _y(top_y + 5), "SRI LANKA MEDICAL COUNCIL")
-        c.setFont("Helvetica-Bold", 9)
-        c.drawCentredString(center_x, _y(top_y + 13), exam_title)
-        c.setFont("Helvetica", 8)
-        c.drawCentredString(center_x, _y(top_y + 21), f"Date: {exam_date}")
-        c.setFont("Helvetica-Oblique", 7)
-        c.drawCentredString(center_x, _y(top_y + 32), "Fill all digit positions in the grid")
 
-        # Separator below both left pane and grid (grid bottom ≈ top+45mm)
-        sep_y = top_y + 45
+        c.setFont("Helvetica-Bold", 9)
+        for i, line in enumerate(title_lines):
+            c.drawCentredString(center_x, _y(top_y + 13 + i * title_line_h_mm), line)
+        extra = (len(title_lines) - 1) * title_line_h_mm
+
+        c.setFont("Helvetica", 8)
+        c.drawCentredString(center_x, _y(top_y + 21 + extra), f"Date: {exam_date}")
+        c.setFont("Helvetica-Oblique", 7)
+        c.drawCentredString(center_x, _y(top_y + 32 + extra), "Fill all digit positions in the grid")
+
+        sep_y = top_y + 45 + extra
         c.setLineWidth(0.5)
         c.line(_mm_to_pt(HEADER_LEFT_MM), _y(sep_y), _mm_to_pt(HEADER_RIGHT_MM), _y(sep_y))
     else:
         c.setFont("Helvetica-Bold", 14)
         c.drawCentredString(PAGE_WIDTH / 2, _y(HEADER_TOP_MM), "SRI LANKA MEDICAL COUNCIL")
+
         c.setFont("Helvetica-Bold", 11)
-        c.drawCentredString(PAGE_WIDTH / 2, _y(HEADER_TOP_MM + 7), exam_title)
+        for i, line in enumerate(title_lines):
+            c.drawCentredString(PAGE_WIDTH / 2, _y(HEADER_TOP_MM + 7 + i * title_line_h_mm), line)
+        extra = (len(title_lines) - 1) * title_line_h_mm
 
         c.setFont("Helvetica", 10)
-        y_detail = _y(HEADER_TOP_MM + 14)
+        y_detail = _y(HEADER_TOP_MM + 14 + extra)
         c.drawString(_mm_to_pt(HEADER_LEFT_MM), y_detail, f"Index No: {index_number}")
         c.drawString(_mm_to_pt(120), y_detail, f"Date: {exam_date}")
 
-        # Horizontal separator
         c.setLineWidth(0.5)
         c.line(
-            _mm_to_pt(HEADER_LEFT_MM), _y(HEADER_TOP_MM + 20),
-            _mm_to_pt(HEADER_RIGHT_MM), _y(HEADER_TOP_MM + 20),
+            _mm_to_pt(HEADER_LEFT_MM), _y(HEADER_TOP_MM + 20 + extra),
+            _mm_to_pt(HEADER_RIGHT_MM), _y(HEADER_TOP_MM + 20 + extra),
         )
 
 
