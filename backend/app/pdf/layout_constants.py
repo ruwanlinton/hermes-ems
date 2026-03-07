@@ -31,7 +31,21 @@ ALIGN_MARKS_MM = {
 # --- QR Code (30x30mm centered at top) ---
 QR_SIZE_MM = 30.0
 QR_TOP_MM = 25.0  # top edge of QR code from page top
-QR_LEFT_MM = (PAGE_W_MM - QR_SIZE_MM) / 2.0  # centered
+QR_LEFT_MM = (PAGE_W_MM - QR_SIZE_MM) / 2.0  # centered (used in "qr" mode)
+QR_LEFT_MM_BOTH = 25.0   # shifted left when id_mode=="both"
+QR_TOP_MM_BOTH = 22.0
+
+# --- ID Digit Bubble Grid ---
+# A 10-row (digits 0-9) × N-column (digit positions) bubble grid.
+# Always placed on the right side of the header area.
+ID_GRID_DIGIT_COUNT = 8       # number of digit columns (supports up to 99 999 999)
+ID_GRID_BUBBLE_DIAMETER_MM = 2.5
+ID_GRID_CELL_H_MM = 3.5       # row center-to-center spacing
+ID_GRID_CELL_W_MM = 4.0       # column center-to-center spacing
+ID_GRID_LABEL_W_MM = 6.0      # width of the "0"–"9" label column on the left
+ID_GRID_HEADER_H_MM = 5.0     # height of the column-number header row
+ID_GRID_TOP_MM = 20.0         # y of grid top from page top
+ID_GRID_LEFT_MM = 135.0       # x of grid left edge (right side, all grid modes)
 
 # --- Header section ---
 HEADER_TOP_MM = 60.0    # top of header block

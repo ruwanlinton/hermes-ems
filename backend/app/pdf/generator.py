@@ -15,7 +15,7 @@ from PIL import Image
 
 from .layout_constants import (
     ALIGN_MARK_SIZE_MM, ALIGN_MARKS_MM,
-    QR_SIZE_MM, QR_TOP_MM, QR_LEFT_MM,
+    QR_SIZE_MM, QR_TOP_MM, QR_LEFT_MM, QR_LEFT_MM_BOTH, QR_TOP_MM_BOTH,
     HEADER_TOP_MM, HEADER_LEFT_MM, HEADER_RIGHT_MM,
     BUBBLE_DIAMETER_MM, BUBBLE_SPACING_MM,
     SECTION_A_TOP_MM, SECTION_A_LEFT_MM, SECTION_A_COL2_LEFT_MM, SECTION_A_COL3_LEFT_MM, SECTION_A_ROW_HEIGHT_MM,
@@ -23,6 +23,8 @@ from .layout_constants import (
     SECTION_B_BUBBLE_DIAMETER_MM, SECTION_B_BUBBLE_SPACING_MM,
     SECTION_B_ROW_LABELS, OPTIONS_TYPE1, OPTIONS_TYPE2,
     PAGE_H_MM,
+    ID_GRID_DIGIT_COUNT, ID_GRID_BUBBLE_DIAMETER_MM, ID_GRID_CELL_H_MM, ID_GRID_CELL_W_MM,
+    ID_GRID_LABEL_W_MM, ID_GRID_HEADER_H_MM, ID_GRID_TOP_MM, ID_GRID_LEFT_MM,
 )
 
 PAGE_WIDTH, PAGE_HEIGHT = A4  # in points
@@ -59,23 +61,61 @@ def _draw_alignment_marks(c: canvas.Canvas) -> None:
         c.rect(x_pt, y_pt, w_pt, h_pt, stroke=0, fill=1)
 
 
-def _draw_qr(c: canvas.Canvas, exam_id: str, index_number: str) -> None:
+def _draw_qr(c: canvas.Canvas, exam_id: str, index_number: str, shifted: bool = False) -> None:
     data = {"exam_id": exam_id, "index_number": index_number}
     img = _generate_qr_image(data)
 
-    # Save QR to buffer
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
 
-    x_pt = _mm_to_pt(QR_LEFT_MM)
-    y_pt = _y(QR_TOP_MM + QR_SIZE_MM)
+    x_left = QR_LEFT_MM_BOTH if shifted else QR_LEFT_MM
+    y_top = QR_TOP_MM_BOTH if shifted else QR_TOP_MM
+    x_pt = _mm_to_pt(x_left)
+    y_pt = _y(y_top + QR_SIZE_MM)
     size_pt = _mm_to_pt(QR_SIZE_MM)
     c.drawImage(
         ImageReader(buf),
         x_pt, y_pt, width=size_pt, height=size_pt,
         preserveAspectRatio=True,
     )
+
+
+def _draw_id_digit_grid(c: canvas.Canvas) -> None:
+    """Draw a digit bubble grid for manual index number entry (right side of header)."""
+    x0 = ID_GRID_LEFT_MM
+    y0 = ID_GRID_TOP_MM
+    n = ID_GRID_DIGIT_COUNT
+    r_pt = _mm_to_pt(ID_GRID_BUBBLE_DIAMETER_MM / 2)
+
+    # Title label
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 6)
+    c.drawString(_mm_to_pt(x0), _y(y0 - 2), "INDEX NUMBER")
+
+    # Column-position headers (1, 2, … n)
+    for col in range(n):
+        cx_mm = x0 + ID_GRID_LABEL_W_MM + col * ID_GRID_CELL_W_MM
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 6)
+        c.drawCentredString(_mm_to_pt(cx_mm), _y(y0 + ID_GRID_HEADER_H_MM - 1), str(col + 1))
+
+    # Rows 0–9
+    for row in range(10):
+        cy_mm = y0 + ID_GRID_HEADER_H_MM + row * ID_GRID_CELL_H_MM
+
+        # Digit label
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 6)
+        c.drawRightString(_mm_to_pt(x0 + ID_GRID_LABEL_W_MM - 1), _y(cy_mm + 0.8), str(row))
+
+        # Bubbles for each digit position
+        for col in range(n):
+            cx_mm = x0 + ID_GRID_LABEL_W_MM + col * ID_GRID_CELL_W_MM
+            c.setFillColor(colors.white)
+            c.setStrokeColor(colors.black)
+            c.setLineWidth(0.4)
+            c.circle(_mm_to_pt(cx_mm), _y(cy_mm), r_pt, stroke=1, fill=0)
 
 
 def _draw_header(c: canvas.Canvas, exam_title: str, index_number: str, exam_date: str) -> None:
@@ -270,14 +310,30 @@ def generate_sheet(
     exam_date: str,
     type1_questions: list[dict],
     type2_questions: list[dict],
+    id_mode: str = "qr",
 ) -> bytes:
-    """Generate a single OMR answer sheet PDF and return as bytes."""
+    """Generate a single OMR answer sheet PDF and return as bytes.
+
+    id_mode:
+      "qr"          – QR code only (default, personalised per candidate)
+      "bubble_grid" – digit bubble grid only (blank template, candidate fills index number)
+      "both"        – QR shifted left + digit bubble grid on the right
+    """
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
 
     _draw_alignment_marks(c)
-    _draw_qr(c, exam_id, index_number)
-    _draw_header(c, exam_title, index_number, exam_date)
+
+    if id_mode == "qr":
+        _draw_qr(c, exam_id, index_number)
+    elif id_mode == "both":
+        _draw_qr(c, exam_id, index_number, shifted=True)
+        _draw_id_digit_grid(c)
+    elif id_mode == "bubble_grid":
+        _draw_id_digit_grid(c)
+
+    header_index = index_number if id_mode != "bubble_grid" else "_______________"
+    _draw_header(c, exam_title, header_index, exam_date)
 
     y_after_a = _draw_section_a(c, type1_questions)
 
@@ -298,18 +354,34 @@ def generate_batch_pdf(
     index_numbers: list[str],
     type1_questions: list[dict],
     type2_questions: list[dict],
+    id_mode: str = "qr",
 ) -> bytes:
-    """Generate a multi-page PDF with one sheet per index number."""
+    """Generate a multi-page PDF with one sheet per index number.
+
+    When id_mode=="bubble_grid", a single blank template page is generated
+    regardless of index_numbers (all sheets are identical).
+    """
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
 
-    for idx, index_number in enumerate(index_numbers):
+    pages = [""] if id_mode == "bubble_grid" else index_numbers
+
+    for idx, index_number in enumerate(pages):
         if idx > 0:
             c.showPage()
 
         _draw_alignment_marks(c)
-        _draw_qr(c, exam_id, index_number)
-        _draw_header(c, exam_title, index_number, exam_date)
+
+        if id_mode == "qr":
+            _draw_qr(c, exam_id, index_number)
+        elif id_mode == "both":
+            _draw_qr(c, exam_id, index_number, shifted=True)
+            _draw_id_digit_grid(c)
+        elif id_mode == "bubble_grid":
+            _draw_id_digit_grid(c)
+
+        header_index = index_number if id_mode != "bubble_grid" else "_______________"
+        _draw_header(c, exam_title, header_index, exam_date)
 
         y_after_a = _draw_section_a(c, type1_questions)
         if type2_questions:

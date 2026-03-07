@@ -9,6 +9,8 @@ from app.pdf.layout_constants import (
     SECTION_B_LEFT_MM, SECTION_B_COL2_LEFT_MM, SECTION_B_COL3_LEFT_MM, SECTION_B_COL4_LEFT_MM, SECTION_B_BLOCK_HEIGHT_MM,
     SECTION_B_BUBBLE_DIAMETER_MM, SECTION_B_BUBBLE_SPACING_MM,
     OPTIONS_TYPE1, OPTIONS_TYPE2, SECTION_B_ROW_LABELS,
+    ID_GRID_DIGIT_COUNT, ID_GRID_BUBBLE_DIAMETER_MM, ID_GRID_CELL_H_MM, ID_GRID_CELL_W_MM,
+    ID_GRID_LABEL_W_MM, ID_GRID_HEADER_H_MM, ID_GRID_TOP_MM, ID_GRID_LEFT_MM,
     mm_to_px,
 )
 
@@ -140,6 +142,40 @@ def detect_type2_answers(
         answers[str(q["question_number"])] = q_answers
 
     return answers
+
+
+def detect_digit_grid(
+    img_gray: np.ndarray,
+    fill_threshold: float = 0.50,
+) -> Optional[str]:
+    """
+    Detect filled bubbles in the ID digit bubble grid.
+    Returns a zero-padded numeric string (e.g. "00012345") or None if
+    any column has no filled bubble (ambiguous / unreadable).
+    """
+    r_px = mm_to_px(ID_GRID_BUBBLE_DIAMETER_MM / 2)
+    digits = []
+
+    for col in range(ID_GRID_DIGIT_COUNT):
+        cx_mm = ID_GRID_LEFT_MM + ID_GRID_LABEL_W_MM + col * ID_GRID_CELL_W_MM
+        cx_px = mm_to_px(cx_mm)
+
+        best_digit = None
+        best_ratio = fill_threshold  # must exceed threshold to count
+
+        for row in range(10):
+            cy_mm = ID_GRID_TOP_MM + ID_GRID_HEADER_H_MM + row * ID_GRID_CELL_H_MM
+            cy_px = mm_to_px(cy_mm)
+            ratio = _fill_ratio(img_gray, cx_px, cy_px, r_px)
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_digit = row
+
+        if best_digit is None:
+            return None
+        digits.append(str(best_digit))
+
+    return "".join(digits)
 
 
 def detect_all_answers(

@@ -14,7 +14,7 @@ from app.db.models import Submission, Result, Question, AnswerKey
 from app.omr.ingest import ingest_image, IngestError
 from app.omr.qr_decode import decode_qr, QRDecodeError
 from app.omr.perspective import correct_perspective, PerspectiveError
-from app.omr.bubble_detect import detect_all_answers
+from app.omr.bubble_detect import detect_all_answers, detect_digit_grid
 from app.omr.grader import grade_submission
 
 settings = get_settings()
@@ -83,16 +83,28 @@ async def process_submission(
     except IngestError as e:
         return await _fail("ingest", str(e))
 
-    # Stage 2: QR Decode
+    # Stage 2: QR Decode — if QR is absent/unreadable, fall back to digit bubble grid
     try:
         qr_data = decode_qr(img)
         index_number = qr_data["index_number"]
         qr_exam_id = qr_data["exam_id"]
-    except QRDecodeError as e:
-        return await _fail("qr_decode", str(e))
-
-    if qr_exam_id != exam_id:
-        return await _fail("qr_decode", f"QR exam_id mismatch: expected {exam_id}, got {qr_exam_id}")
+        if qr_exam_id != exam_id:
+            return await _fail("qr_decode", f"QR exam_id mismatch: expected {exam_id}, got {qr_exam_id}")
+    except QRDecodeError:
+        # Attempt digit grid fallback (perspective-correct the image first)
+        try:
+            img_pre = correct_perspective(img)
+        except Exception:
+            img_pre = img
+        import cv2 as _cv2
+        gray_pre = _cv2.cvtColor(img_pre, _cv2.COLOR_BGR2GRAY)
+        index_number = detect_digit_grid(gray_pre, fill_threshold=threshold)
+        if not index_number:
+            return await _fail(
+                "qr_decode",
+                "QR code unreadable and digit bubble grid detection failed. "
+                "Ensure the sheet is not damaged and all digit columns are filled.",
+            )
 
     submission.index_number = index_number
 
