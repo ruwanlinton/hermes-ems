@@ -28,6 +28,7 @@ export function Navbar() {
       <div style={styles.links}>
         <Link to="/" style={styles.link}>Dashboard</Link>
         <Link to="/exams" style={styles.link}>Exams</Link>
+        <Link to="/settings" style={styles.link}>Settings</Link>
       </div>
       <div style={styles.user}>
         {state.username && <span style={styles.username}>{state.username}</span>}

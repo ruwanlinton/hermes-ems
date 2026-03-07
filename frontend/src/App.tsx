@@ -14,6 +14,7 @@ import { SheetGeneratorPage } from "./pages/SheetGeneratorPage";
 import { UploadPage } from "./pages/UploadPage";
 import { SubmissionsPage } from "./pages/SubmissionsPage";
 import { ResultsPage } from "./pages/ResultsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 export function App() {
   const { getAccessToken } = useAuthContext();
@@ -34,6 +35,7 @@ export function App() {
         <Route path="/exams/:id/upload" element={<AuthGuard><UploadPage /></AuthGuard>} />
         <Route path="/exams/:id/submissions" element={<AuthGuard><SubmissionsPage /></AuthGuard>} />
         <Route path="/exams/:id/results" element={<AuthGuard><ResultsPage /></AuthGuard>} />
+        <Route path="/settings" element={<AuthGuard><SettingsPage /></AuthGuard>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { Layout } from "../components/layout/Layout";
 import { examsApi } from "../api/exams";
+import { loadSettings } from "../settings";
 
 const ID_MODES = [
   {
@@ -20,7 +21,7 @@ export function SheetGeneratorPage() {
   const { id } = useParams<{ id: string }>();
   const [idMode, setIdMode] = useState("qr");
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [digitCount, setDigitCount] = useState(8);
+  const [digitCount, setDigitCount] = useState(() => loadSettings().defaultDigitCount);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
 

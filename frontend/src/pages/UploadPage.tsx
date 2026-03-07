@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { Layout } from "../components/layout/Layout";
 import { DropZone } from "../components/upload/DropZone";
 import { submissionsApi, type BatchResult } from "../api/submissions";
+import { loadSettings } from "../settings";
 
 interface FileStatus {
   file: File;
@@ -14,7 +15,7 @@ export function UploadPage() {
   const { id } = useParams<{ id: string }>();
   const [files, setFiles] = useState<FileStatus[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [digitCount, setDigitCount] = useState(8);
+  const [digitCount, setDigitCount] = useState(() => loadSettings().defaultDigitCount);
 
   const handleFiles = (newFiles: File[]) => {
     setFiles((prev) => [
