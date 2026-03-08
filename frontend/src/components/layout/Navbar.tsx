@@ -10,7 +10,7 @@ export function Navbar() {
   useEffect(() => {
     if (state.isAuthenticated) {
       getBasicUserInfo().then((info) => {
-        setDisplayName(info.displayName || info.givenName || info.username || "");
+setDisplayName(info.displayName || info.givenName || info.username || "");
       }).catch(() => {
         setDisplayName(state.username || "");
       });
