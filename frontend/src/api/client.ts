@@ -6,17 +6,10 @@ export const apiClient = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-/**
- * Call this once after Asgardeo initializes to inject the token interceptor.
- */
-export function setupAuthInterceptor(getAccessToken: () => Promise<string>) {
-  apiClient.interceptors.request.use(async (config) => {
-    try {
-      const token = await getAccessToken();
-      config.headers.Authorization = `Bearer ${token}`;
-    } catch {
-      // Token fetch failed — let the request go through (will get 401)
-    }
-    return config;
-  });
-}
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem("auth_token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});

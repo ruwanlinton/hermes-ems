@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.db.session import get_db
 from app.db.models import Exam, Question, User
-from app.auth.jwt import get_current_user
+from app.auth.jwt import require_roles
 from app.pdf.generator import generate_batch_pdf
 
 router = APIRouter()
@@ -21,7 +21,7 @@ async def generate_sheets(
     digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in bubble grid (1–10, bubble_grid mode only)"),
     csv_file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("admin", "creator")),
 ):
     """Generate OMR answer sheets PDF.
 

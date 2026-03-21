@@ -1,8 +1,4 @@
-import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuthContext } from "@asgardeo/auth-react";
-
-import { setupAuthInterceptor } from "./api/client";
 import { AuthGuard } from "./auth/AuthGuard";
 
 import { LoginPage } from "./pages/LoginPage";
@@ -20,12 +16,6 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { UserManagementPage } from "./pages/UserManagementPage";
 
 export function App() {
-  const { getAccessToken } = useAuthContext();
-
-  useEffect(() => {
-    setupAuthInterceptor(getAccessToken);
-  }, [getAccessToken]);
-
   return (
     <BrowserRouter>
       <Routes>

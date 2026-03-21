@@ -1,14 +1,32 @@
-import { useAuthContext } from "@asgardeo/auth-react";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
 
 export function LoginPage() {
-  const { state, signIn } = useAuthContext();
+  const { token, login } = useAuth();
   const navigate = useNavigate();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (state.isAuthenticated) navigate("/");
-  }, [state.isAuthenticated, navigate]);
+    if (token) navigate("/");
+  }, [token, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await login(username, password);
+      navigate("/");
+    } catch {
+      setError("Invalid username or password.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={styles.container}>
@@ -21,12 +39,30 @@ export function LoginPage() {
         <h1 style={styles.title}>Sri Lanka Medical Council</h1>
         <div style={styles.divider} />
         <h2 style={styles.subtitle}>OMR Exam Management System</h2>
-        <p style={styles.description}>
-          Manage MCQ licensing exams, generate answer sheets, and process OMR results.
-        </p>
-        <button onClick={() => signIn()} style={styles.signInBtn}>
-          Sign in with Asgardeo
-        </button>
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            style={styles.input}
+            autoComplete="username"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={styles.input}
+            autoComplete="current-password"
+            required
+          />
+          {error && <p style={styles.errorText}>{error}</p>}
+          <button type="submit" disabled={loading} style={styles.signInBtn}>
+            {loading ? "Signing in…" : "Sign In"}
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -54,8 +90,17 @@ const styles: Record<string, React.CSSProperties> = {
   logo: { height: 72, width: "auto", objectFit: "contain", marginBottom: 16 },
   title: { fontSize: 20, fontWeight: 700, color: "#233654", marginBottom: 0 },
   divider: { width: 48, height: 3, background: "#b79a62", margin: "12px auto" },
-  subtitle: { fontSize: 15, fontWeight: 500, color: "#4a5568", marginBottom: 12 },
-  description: { fontSize: 13, color: "#718096", marginBottom: 32, lineHeight: 1.6 },
+  subtitle: { fontSize: 15, fontWeight: 500, color: "#4a5568", marginBottom: 24 },
+  form: { display: "flex", flexDirection: "column", gap: 12 },
+  input: {
+    padding: "11px 14px",
+    border: "1px solid #e2e8f0",
+    borderRadius: 4,
+    fontSize: 14,
+    color: "#2d3748",
+    outline: "none",
+  },
+  errorText: { fontSize: 13, color: "#c53030", margin: 0 },
   signInBtn: {
     padding: "12px 32px",
     background: "#ba3c3c",
@@ -67,5 +112,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     width: "100%",
     letterSpacing: 0.3,
+    marginTop: 4,
   },
 };

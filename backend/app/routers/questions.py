@@ -5,10 +5,13 @@ from typing import List
 
 from app.db.session import get_db
 from app.db.models import Exam, Question, User
-from app.auth.jwt import get_current_user
+from app.auth.jwt import require_roles
 from app.schemas.exam import QuestionCreate, QuestionBulkCreate, QuestionOut
 
 router = APIRouter()
+
+_any_role = require_roles("admin", "creator", "marker", "viewer")
+_creator_plus = require_roles("admin", "creator")
 
 
 async def _get_exam_or_404(exam_id: str, db: AsyncSession) -> Exam:
@@ -23,7 +26,7 @@ async def _get_exam_or_404(exam_id: str, db: AsyncSession) -> Exam:
 async def list_questions(
     exam_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(_any_role),
 ):
     await _get_exam_or_404(exam_id, db)
     result = await db.execute(
@@ -39,7 +42,7 @@ async def create_question(
     exam_id: str,
     payload: QuestionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(_creator_plus),
 ):
     await _get_exam_or_404(exam_id, db)
     question = Question(exam_id=exam_id, **payload.model_dump())
@@ -54,21 +57,13 @@ async def bulk_create_questions(
     exam_id: str,
     payload: QuestionBulkCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(_creator_plus),
 ):
     exam = await _get_exam_or_404(exam_id, db)
-
-    # Delete existing questions for idempotent bulk replace
     await db.execute(delete(Question).where(Question.exam_id == exam_id))
-
-    questions = [
-        Question(exam_id=exam_id, **q.model_dump()) for q in payload.questions
-    ]
+    questions = [Question(exam_id=exam_id, **q.model_dump()) for q in payload.questions]
     db.add_all(questions)
-
-    # Update exam total_questions
     exam.total_questions = len(questions)
-
     await db.commit()
     result = await db.execute(
         select(Question)

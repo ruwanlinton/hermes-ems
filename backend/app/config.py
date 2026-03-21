@@ -4,15 +4,13 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://slmc:slmc@localhost:5432/slmc_omr"
-    ASGARDEO_BASE_URL: str = "https://api.asgardeo.io/t/your-org"
-    JWT_AUDIENCE: str = "your-oauth2-client-id"
+    JWT_SECRET_KEY: str = "change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_HOURS: int = 8
     UPLOAD_DIR: str = "/tmp/slmc_uploads"
     FILL_THRESHOLD: float = 0.50
     MAX_UPLOAD_SIZE_MB: int = 20
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
-    # M2M app credentials for SCIM2 user management (client_credentials grant)
-    ASGARDEO_SCIM_CLIENT_ID: str = ""
-    ASGARDEO_SCIM_CLIENT_SECRET: str = ""
 
     class Config:
         env_file = ".env"

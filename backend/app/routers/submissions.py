@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.db.session import get_db
 from app.db.models import Exam, Submission, User
-from app.auth.jwt import get_current_user
+from app.auth.jwt import require_roles
 from app.config import get_settings
 from app.omr.pipeline import process_submission
 from app.schemas.submission import SubmissionOut
@@ -44,7 +44,7 @@ async def upload_submission(
     file: UploadFile = File(...),
     digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in the bubble grid (for bubble_grid id sheets)"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("admin", "creator", "marker")),
 ):
     """Upload a single OMR sheet image and process it."""
     await _get_exam_or_404(exam_id, db)
@@ -78,7 +78,7 @@ async def batch_upload_submissions(
     files: List[UploadFile] = File(...),
     digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in the bubble grid (for bubble_grid id sheets)"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("admin", "creator", "marker")),
 ):
     """Upload multiple OMR sheet images and process them sequentially."""
     await _get_exam_or_404(exam_id, db)
@@ -122,7 +122,7 @@ async def batch_upload_submissions(
 async def list_submissions(
     exam_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("admin", "creator", "marker")),
 ):
     await _get_exam_or_404(exam_id, db)
     result = await db.execute(
@@ -138,7 +138,7 @@ async def get_submission(
     exam_id: str,
     submission_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("admin", "creator", "marker")),
 ):
     result = await db.execute(
         select(Submission).where(
@@ -156,7 +156,7 @@ async def get_submission_image(
     exam_id: str,
     submission_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("admin", "creator", "marker")),
 ):
     """Download the original scanned image for a submission."""
     result = await db.execute(
@@ -180,7 +180,7 @@ async def reprocess_submission(
     submission_id: str,
     digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in the bubble grid (for bubble_grid id sheets)"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("admin", "creator", "marker")),
 ):
     """Reprocess a submission from its saved image file."""
     result = await db.execute(

@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Layout } from "../components/layout/Layout";
 import { examsApi, type Exam } from "../api/exams";
+import { useAuth, hasRole } from "../auth/AuthContext";
 
 export function ExamsPage() {
+  const { user } = useAuth();
+  const canCreate = hasRole(user, "admin", "creator");
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,14 +27,14 @@ export function ExamsPage() {
     <Layout>
       <div style={styles.header}>
         <h1 style={styles.h1}>Exams</h1>
-        <Link to="/exams/new" style={styles.createBtn}>+ Create Exam</Link>
+        {canCreate && <Link to="/exams/new" style={styles.createBtn}>+ Create Exam</Link>}
       </div>
 
       {loading ? (
         <p>Loading...</p>
       ) : exams.length === 0 ? (
         <div style={styles.empty}>
-          <p>No exams found. <Link to="/exams/new">Create one</Link>.</p>
+          <p>No exams found.{canCreate && <> <Link to="/exams/new">Create one</Link>.</>}</p>
         </div>
       ) : (
         <table style={styles.table}>
@@ -61,12 +64,14 @@ export function ExamsPage() {
                 </td>
                 <td style={styles.td}>
                   <Link to={`/exams/${exam.id}`} style={styles.actionBtn}>View</Link>
-                  <button
-                    onClick={() => handleDelete(exam.id)}
-                    style={{ ...styles.actionBtn, ...styles.deleteBtn }}
-                  >
-                    Delete
-                  </button>
+                  {canCreate && (
+                    <button
+                      onClick={() => handleDelete(exam.id)}
+                      style={{ ...styles.actionBtn, ...styles.deleteBtn }}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

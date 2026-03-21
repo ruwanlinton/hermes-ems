@@ -10,8 +10,8 @@ Generates bubble-sheet answer sheets, processes scanned sheets, and grades candi
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.11, FastAPI 0.111, SQLAlchemy 2 (async), Alembic, PostgreSQL 15 |
-| Frontend | React 18, TypeScript, Vite 5, Axios, @asgardeo/auth-react v5 |
-| Auth | Asgardeo OIDC — JWT RS256 access tokens validated against JWKS endpoint |
+| Frontend | React 18, TypeScript, Vite 5, Axios |
+| Auth | DB-backed local auth — bcrypt passwords, HS256 JWT access tokens |
 | PDF | ReportLab 4.1 + qrcode + Pillow |
 | OMR | OpenCV headless 4.9, pyzbar, numpy |
 | DB driver | asyncpg |
@@ -48,8 +48,7 @@ Run migrations: cd backend && .venv/bin/alembic upgrade head
 ### backend/.env
 ```
 DATABASE_URL=postgresql+asyncpg://slmc:slmc@localhost:5432/slmc_omr
-ASGARDEO_BASE_URL=https://api.asgardeo.io/t/slmc
-JWT_AUDIENCE=QI1sf4ObwKxCbLbLb23oYo1IdAka
+JWT_SECRET_KEY=slmc-omr-secret-key-change-in-production
 UPLOAD_DIR=/tmp/slmc_uploads
 FILL_THRESHOLD=0.50
 CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
@@ -57,8 +56,6 @@ CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
 
 ### frontend/.env
 ```
-VITE_ASGARDEO_CLIENT_ID=QI1sf4ObwKxCbLbLb23oYo1IdAka
-VITE_ASGARDEO_BASE_URL=https://api.asgardeo.io/t/slmc
 VITE_API_BASE_URL=http://localhost:8000
 ```
 
@@ -72,7 +69,7 @@ slmc-exam-omr/
 │   ├── app/
 │   │   ├── main.py             # FastAPI app, CORS, router mounts
 │   │   ├── config.py           # Pydantic settings (reads .env)
-│   │   ├── auth/jwt.py         # Asgardeo JWKS fetch, JWT decode, user upsert
+│   │   ├── auth/jwt.py         # bcrypt password hashing, HS256 JWT creation/validation
 │   │   ├── db/
 │   │   │   ├── models.py       # SQLAlchemy ORM: User, Exam, Question, AnswerKey, Submission, Result
 │   │   │   └── session.py      # Async session factory, get_db dependency
@@ -100,7 +97,8 @@ slmc-exam-omr/
         │   ├── client.ts       # Axios instance + auth interceptor
         │   └── exams.ts        # All exam/question/sheet API calls
         ├── auth/
-        │   ├── authConfig.ts   # Asgardeo config
+        │   ├── authConfig.ts   # API_BASE_URL export
+        │   ├── AuthContext.tsx # React context: user, token, login(), logout()
         │   └── AuthGuard.tsx   # Route protection
         ├── components/layout/
         │   ├── Navbar.tsx      # SLMC logo, navy/gold theme
@@ -185,12 +183,15 @@ Key constants:
 
 An exam always has **one question type** — never mixed.
 
-## Auth — Asgardeo
+## Auth — Local DB
 
-- Frontend uses `@asgardeo/auth-react` v5 (`getAccessToken()` returns JWT access token)
-- Backend fetches JWKS from `{ASGARDEO_BASE_URL}/oauth2/jwks`, caches in memory, refreshes on kid rotation
-- `get_current_user()` dependency decodes token and upserts User row on first login
-- JWT audience must match `JWT_AUDIENCE` env var exactly (no stray prefixes)
+- `POST /api/v1/auth/login` — JSON `{username, password}` → `{access_token, token_type, user}`
+- Passwords hashed with bcrypt (using `bcrypt` library directly, NOT passlib — passlib has bcrypt 5.x incompatibility)
+- JWT signed with HS256 using `JWT_SECRET_KEY`, expires in 8 hours (configurable via `JWT_EXPIRE_HOURS`)
+- Token stored in `localStorage` as `auth_token`; user info stored as `auth_user`
+- Frontend `AuthContext` (`useAuth()`) provides `user`, `token`, `login()`, `logout()`
+- Axios interceptor in `api/client.ts` reads token from localStorage on each request
+- Default admin seeded on first startup: username=`admin`, password=`admin123` (change immediately)
 - Backend must be started from `backend/` directory so `.env` is found
 
 ## UI Theme — SLMC Brand
@@ -212,7 +213,7 @@ An exam always has **one question type** — never mixed.
 4. **node not in PATH**: Same issue. Use full path `/opt/homebrew/Cellar/node/25.7.0/bin/node` or prepend to PATH.
 5. **id_mode as query param**: Was originally a Form field but multipart parsing was unreliable when no file was attached. Changed to query parameter — keep it that way.
 6. **Optional[UploadFile]**: Must use `= File(None)` annotation (not just `= None`) for FastAPI to parse the multipart body.
-7. **Asgardeo opaque tokens**: If `getAccessToken()` returns a short opaque string instead of a JWT, the Asgardeo application needs "Token type: JWT" configured in the Asgardeo console.
+7. **bcrypt + passlib incompatibility**: bcrypt 5.x raises ValueError during passlib's internal wrap-bug detection. Use `bcrypt` library directly (`bcrypt.hashpw`/`bcrypt.checkpw`), not `passlib.context.CryptContext`.
 
 ## Git
 

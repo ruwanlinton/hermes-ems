@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { ExamLayout } from "../components/layout/ExamLayout";
 import { examsApi, type Exam, type Question, type AnswerKey } from "../api/exams";
+import { useAuth, hasRole } from "../auth/AuthContext";
 
 export function ExamDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const canEditAnswerKey = hasRole(user, "admin", "creator");
   const [exam, setExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answerKeys, setAnswerKeys] = useState<AnswerKey[]>([]);
@@ -18,7 +21,7 @@ export function ExamDetailPage() {
     Promise.all([
       examsApi.get(id),
       examsApi.listQuestions(id),
-      examsApi.getAnswerKey(id),
+      examsApi.getAnswerKey(id).catch(() => ({ data: [] as AnswerKey[] })),
     ]).then(([examRes, questionsRes, akRes]) => {
       setExam(examRes.data);
       setEditTitle(examRes.data.title);
@@ -64,7 +67,6 @@ export function ExamDetailPage() {
   if (!exam) return <ExamLayout><p>Exam not found.</p></ExamLayout>;
 
   const type1 = questions.filter((q) => q.question_type === "type1");
-  const type2 = questions.filter((q) => q.question_type === "type2");
 
   const answerKeyComplete = questions.length > 0 && questions.every((q) => {
     const ak = answerKeys.find((a) => a.question_id === q.id);
@@ -77,7 +79,7 @@ export function ExamDetailPage() {
   return (
     <ExamLayout>
       <div style={styles.header}>
-        {editing ? (
+        {canEditAnswerKey && (editing ? (
           <div style={styles.editRow}>
             <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} style={styles.titleInput} />
             <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={styles.select}>
@@ -90,7 +92,7 @@ export function ExamDetailPage() {
           </div>
         ) : (
           <button onClick={() => setEditing(true)} style={styles.editBtn}>Edit Exam</button>
-        )}
+        ))}
       </div>
 
       <div style={styles.meta}>
@@ -140,6 +142,7 @@ export function ExamDetailPage() {
                             value={ak?.correct_option || ""}
                             onChange={(e) => handleAnswerKeyChange(q.id, "correct_option", e.target.value)}
                             style={styles.akSelect}
+                            disabled={!canEditAnswerKey}
                           >
                             <option value="">— select —</option>
                             {["A", "B", "C", "D", "E"].map((o) => (
@@ -159,6 +162,7 @@ export function ExamDetailPage() {
                                     handleAnswerKeyChange(q.id, "sub_options", updated as Record<string, boolean>);
                                   }}
                                   style={styles.t2Select}
+                                  disabled={!canEditAnswerKey}
                                 >
                                   <option value="">—</option>
                                   <option value="T">T</option>
@@ -175,7 +179,9 @@ export function ExamDetailPage() {
               </tbody>
             </table>
           </div>
-          <button onClick={handleSaveAnswerKey} style={styles.saveAkBtn}>Save Answer Key</button>
+          {canEditAnswerKey && (
+            <button onClick={handleSaveAnswerKey} style={styles.saveAkBtn}>Save Answer Key</button>
+          )}
         </div>
       )}
     </ExamLayout>

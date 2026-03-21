@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Layout } from "../components/layout/Layout";
 import { examsApi, type Exam } from "../api/exams";
+import { useAuth, hasRole } from "../auth/AuthContext";
 
 export function DashboardPage() {
+  const { user } = useAuth();
+  const canCreate = hasRole(user, "admin", "creator");
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,14 +34,14 @@ export function DashboardPage() {
       <div style={styles.section}>
         <div style={styles.sectionHeader}>
           <h2 style={styles.h2}>Recent Exams</h2>
-          <Link to="/exams/new" style={styles.createBtn}>+ New Exam</Link>
+          {canCreate && <Link to="/exams/new" style={styles.createBtn}>+ New Exam</Link>}
         </div>
 
         {loading ? (
           <p style={styles.muted}>Loading...</p>
         ) : exams.length === 0 ? (
           <div style={styles.empty}>
-            <p>No exams yet. <Link to="/exams/new" style={styles.link}>Create your first exam</Link>.</p>
+            <p>No exams yet.{canCreate && <> <Link to="/exams/new" style={styles.link}>Create your first exam</Link>.</>}</p>
           </div>
         ) : (
           <div style={styles.examList}>

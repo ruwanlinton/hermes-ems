@@ -1,26 +1,12 @@
-import { useAuthContext } from "@asgardeo/auth-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { usersApi } from "../api/users";
+import { useAuth, hasRole } from "../../auth/AuthContext";
 
 export function Navbar() {
-  const { state, signOut, getBasicUserInfo } = useAuthContext();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [displayName, setDisplayName] = useState<string>("");
-  const [isAdmin, setIsAdmin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (state.isAuthenticated) {
-      getBasicUserInfo().then((info) => {
-        setDisplayName(info.displayName || info.givenName || info.username || "");
-      }).catch(() => {
-        setDisplayName(state.username || "");
-      });
-      usersApi.getProfile().then((r) => setIsAdmin(r.data.role === "admin")).catch(() => {});
-    }
-  }, [state.isAuthenticated]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -32,12 +18,13 @@ export function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
     setMenuOpen(false);
-    await signOut();
+    logout();
     navigate("/login");
   };
 
+  const displayName = user?.name || user?.username || "";
   const initials = displayName
     ? displayName.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
     : "";
@@ -60,7 +47,7 @@ export function Navbar() {
       <div style={styles.links}>
         <Link to="/" style={styles.link}>Dashboard</Link>
         <Link to="/exams" style={styles.link}>Exams</Link>
-        {isAdmin && <Link to="/admin/users" style={styles.link}>Users</Link>}
+        {hasRole(user, "admin") && <Link to="/admin/users" style={styles.link}>Users</Link>}
         <Link to="/settings" style={styles.link}>Settings</Link>
       </div>
       <div style={styles.user} ref={menuRef}>
@@ -166,18 +153,9 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: "hidden",
     zIndex: 200,
   },
-  dropdownHeader: {
-    padding: "12px 16px 10px",
-  },
-  dropdownName: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: "#2d3748",
-  },
-  dropdownDivider: {
-    borderTop: "1px solid #e2e8f0",
-    margin: "0",
-  },
+  dropdownHeader: { padding: "12px 16px 10px" },
+  dropdownName: { fontSize: 13, fontWeight: 600, color: "#2d3748" },
+  dropdownDivider: { borderTop: "1px solid #e2e8f0" },
   dropdownItem: {
     display: "block",
     padding: "10px 16px",

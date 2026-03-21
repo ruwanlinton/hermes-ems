@@ -11,9 +11,10 @@ router = APIRouter()
 
 class UserProfile(BaseModel):
     id: str
+    username: str
     email: str | None
     name: str | None
-    role: str
+    roles: list[str]
 
     class Config:
         from_attributes = True

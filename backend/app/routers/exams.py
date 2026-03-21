@@ -5,16 +5,19 @@ from typing import List
 
 from app.db.session import get_db
 from app.db.models import Exam, User
-from app.auth.jwt import get_current_user
+from app.auth.jwt import require_roles
 from app.schemas.exam import ExamCreate, ExamUpdate, ExamOut
 
 router = APIRouter()
+
+_any_role = require_roles("admin", "creator", "marker", "viewer")
+_creator_plus = require_roles("admin", "creator")
 
 
 @router.get("/exams", response_model=List[ExamOut])
 async def list_exams(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(_any_role),
 ):
     result = await db.execute(select(Exam).order_by(Exam.created_at.desc()))
     return result.scalars().all()
@@ -24,7 +27,7 @@ async def list_exams(
 async def create_exam(
     payload: ExamCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(_creator_plus),
 ):
     exam = Exam(**payload.model_dump())
     db.add(exam)
@@ -37,7 +40,7 @@ async def create_exam(
 async def get_exam(
     exam_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(_any_role),
 ):
     result = await db.execute(select(Exam).where(Exam.id == exam_id))
     exam = result.scalar_one_or_none()
@@ -51,16 +54,14 @@ async def update_exam(
     exam_id: str,
     payload: ExamUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(_creator_plus),
 ):
     result = await db.execute(select(Exam).where(Exam.id == exam_id))
     exam = result.scalar_one_or_none()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
-
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(exam, field, value)
-
     await db.commit()
     await db.refresh(exam)
     return exam
@@ -70,7 +71,7 @@ async def update_exam(
 async def delete_exam(
     exam_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(_creator_plus),
 ):
     result = await db.execute(select(Exam).where(Exam.id == exam_id))
     exam = result.scalar_one_or_none()

@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 
 from app.db.session import get_db
 from app.db.models import Exam, Result, Submission, Question, AnswerKey, User
-from app.auth.jwt import get_current_user
+from app.auth.jwt import require_roles
 from app.schemas.submission import ResultOut, ResultSummary, ResultDetail, QuestionDetail
 from app.services.export_service import results_to_csv, results_to_xlsx
 
@@ -26,7 +26,7 @@ async def _get_exam_or_404(exam_id: str, db: AsyncSession) -> Exam:
 async def list_results(
     exam_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("admin", "creator", "marker", "viewer")),
 ):
     await _get_exam_or_404(exam_id, db)
     result = await db.execute(
@@ -42,7 +42,7 @@ async def get_result_detail(
     exam_id: str,
     index_number: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("admin", "creator", "marker", "viewer")),
 ):
     """Return per-question marked/correct/score breakdown for one candidate."""
     await _get_exam_or_404(exam_id, db)
@@ -115,7 +115,7 @@ async def get_results_summary(
     exam_id: str,
     pass_mark: float = Query(default=50.0, description="Pass mark percentage"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("admin", "creator", "marker", "viewer")),
 ):
     await _get_exam_or_404(exam_id, db)
     result = await db.execute(
@@ -174,7 +174,7 @@ async def export_results(
     exam_id: str,
     format: str = Query(default="csv", enum=["csv", "xlsx"]),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("admin", "creator", "marker", "viewer")),
 ):
     await _get_exam_or_404(exam_id, db)
     result = await db.execute(

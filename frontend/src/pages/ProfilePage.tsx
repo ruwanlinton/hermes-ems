@@ -47,8 +47,8 @@ export function ProfilePage() {
             </div>
 
             <div style={styles.row}>
-              <label style={styles.label}>Role</label>
-              <span style={{ ...styles.value, ...styles.roleBadge }}>{profile.role}</span>
+              <label style={styles.label}>Roles</label>
+              <span style={{ ...styles.value, ...styles.roleBadge }}>{profile.roles.join(", ")}</span>
             </div>
 
             <div style={styles.divider} />

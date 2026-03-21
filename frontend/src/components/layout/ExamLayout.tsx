@@ -26,7 +26,7 @@ export function ExamLayout({ children }: ExamLayoutProps) {
     Promise.all([
       examsApi.get(id),
       examsApi.listQuestions(id),
-      examsApi.getAnswerKey(id),
+      examsApi.getAnswerKey(id).catch(() => ({ data: [] as AnswerKey[] })),
     ]).then(([examRes, qRes, akRes]) => {
       setExam(examRes.data);
       const questions: Question[] = qRes.data;
