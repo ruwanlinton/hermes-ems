@@ -4,120 +4,170 @@ Sri Lanka Medical Council — MCQ Licensing Exam OMR Management System.
 
 ## Features
 
-- **Exam Management** — Create and manage MCQ exams with Type 1 (single best answer) and Type 2 (extended true/false) questions
-- **PDF Sheet Generation** — Generate printable OMR answer sheets with QR codes and alignment marks
+- **Exam Management** — Create and manage MCQ exams with Type 1 (single best answer A–E) and Type 2 (extended true/false) questions
+- **PDF Sheet Generation** — Generate printable OMR answer sheets with QR codes, digit bubble grids, or both
 - **OMR Processing** — Upload scanned sheets; the pipeline auto-corrects perspective, detects filled bubbles, and grades answers
-- **Results** — Score aggregation, pass/fail tracking, CSV/XLSX export, score distribution chart
-- **Auth** — Asgardeo OIDC (JWT RS256 validation)
-- **Deployment** — Choreo-ready with `component.yaml` files
+- **Multiple-answer detection** — If a candidate fills more than one bubble for a Type 1 question, it is recorded as "Multiple" and scored as wrong
+- **Results** — Score aggregation, pass/fail tracking, per-candidate question breakdown, CSV/XLSX export, score distribution chart
+- **Auth** — DB-backed local auth with bcrypt passwords and HS256 JWT tokens; role-based access control (admin, creator, marker, viewer)
+- **Deployment** — Docker Compose — runs on any machine with Docker Desktop (Windows, macOS, Linux)
 
 ---
 
 ## Architecture
 
 ```
-slmc-omr/
-├── backend/    # Python FastAPI service
-├── frontend/   # React + TypeScript (Vite)
+slmc-exam-omr/
+├── backend/          # Python 3.11, FastAPI, SQLAlchemy 2 (async), Alembic
+├── frontend/         # React 18, TypeScript, Vite
 └── docker-compose.yml
 ```
 
 ---
 
-## Quick Start (local dev)
+## Quick Start — Docker (recommended)
 
 ### Prerequisites
-- Docker & Docker Compose
-- Node 20+
-- Python 3.11+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows, macOS, or Linux)
 
-### 1. Configure environment
+### 1. Clone the repo
 
 ```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-# Edit both .env files with your Asgardeo credentials
+git clone https://github.com/ruwanlinton/slmc-exam-omr.git
+cd slmc-exam-omr
 ```
 
-### 2. Start with Docker Compose
+### 2. Start everything
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API docs: http://localhost:8000/docs
+First run downloads base images, builds containers, and runs DB migrations automatically. Subsequent starts skip the build:
 
-### 3. Local development (without Docker)
+```bash
+docker compose up
+```
 
-**Backend:**
+### 3. Open the app
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| API docs (Swagger) | http://localhost:8000/docs |
+
+Default login: **username** `admin` / **password** `admin123` — change this immediately after first login.
+
+### Stop
+
+```bash
+docker compose down
+```
+
+Database and uploaded images are persisted in Docker volumes and survive restarts.
+
+### Optional: override settings
+
+Create a `.env` file in the project root:
+
+```env
+JWT_SECRET_KEY=your-long-random-secret
+JWT_EXPIRE_HOURS=8
+```
+
+Docker Compose picks this up automatically on the next `docker compose up`.
+
+---
+
+## Local Development (without Docker)
+
+### Backend
+
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-# Start PostgreSQL separately, then:
+# Ensure PostgreSQL is running, then:
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-**Frontend:**
+Required env vars (create `backend/.env`):
+```env
+DATABASE_URL=postgresql+asyncpg://slmc:slmc@localhost:5432/slmc_omr
+JWT_SECRET_KEY=dev-secret-key
+UPLOAD_DIR=/tmp/slmc_uploads
+FILL_THRESHOLD=0.50
+CORS_ORIGINS=["http://localhost:5173"]
+```
+
+### Frontend
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
+Required env vars (create `frontend/.env`):
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
+
 ---
 
 ## OMR Pipeline
 
-1. **Ingest** — Decode and validate image
-2. **QR Decode** — Extract `exam_id` + `index_number` via pyzbar / cv2
-3. **Perspective Correction** — Detect 4 alignment marks → warpPerspective to 2480×3508px
-4. **Bubble Detection** — Compute fill ratios; threshold = 50% (configurable via `FILL_THRESHOLD`)
-5. **Grading** — Type 1: 1pt per correct; Type 2: 0.2pt per correct sub-option (max 1pt/question)
+1. **Ingest** — Decode and validate image bytes
+2. **QR Decode** — Extract `exam_id` + `index_number` via pyzbar. Falls back to digit bubble grid if no QR is present
+3. **Perspective Correction** — Detect 4 alignment marks → `warpPerspective` to 2480×3508 px
+4. **Bubble Detection** — Compute fill ratios against configurable threshold (default 50%)
+   - Type 1: single filled bubble → answer; multiple filled → `MULTIPLE` (scored wrong)
+5. **Grading** — Type 1: 1 pt per correct answer; Type 2: 0.2 pt per correct sub-option (max 1 pt/question)
+6. **Result Upsert** — ON CONFLICT (exam_id, index_number) DO UPDATE so reprocessing overwrites previous results
 
 ---
 
-## Asgardeo Setup
+## Sheet Generation Modes
 
-1. Create an OIDC app in Asgardeo console
-2. Set Allowed Redirect URLs to your frontend domain + `/` and `/login`
-3. Enable **Token Exchange** to get `resourceServerURLs` working
-4. Copy `Client ID` and `Organization URL` to env files
+| Mode | Description | CSV required |
+|------|-------------|-------------|
+| `qr` | QR code at top — one personalised sheet per CSV row | Yes |
+| `bubble_grid` | Digit bubble grid for manual index entry | No |
+| `both` | QR shifted left + digit grid right | Yes |
 
 ---
 
-## Choreo Deployment
+## Role-Based Access
 
-1. Push this repo to GitHub
-2. In Choreo, create a **Service** component pointing to `backend/` with the provided `component.yaml`
-3. Create a **Web Application** component pointing to `frontend/`
-4. Add secrets in Choreo for all required env vars
-5. Deploy — Choreo injects the DB URL and Asgardeo credentials automatically
+| Role | Permissions |
+|------|-------------|
+| `admin` | Full access including user management |
+| `creator` | Create/edit exams, generate sheets, upload submissions |
+| `marker` | Upload and reprocess submissions, view results |
+| `viewer` | Read-only access to submissions and results |
 
 ---
 
 ## API Reference
 
-All endpoints require `Authorization: Bearer <token>` (Asgardeo JWT).
-
-Base path: `/api/v1`
+All endpoints require `Authorization: Bearer <token>`. Base path: `/api/v1`
 
 | Method | Path | Description |
 |--------|------|-------------|
+| POST | `/auth/login` | Login → `{access_token, user}` |
 | GET/POST | `/exams` | List / create exams |
-| GET/PATCH/DELETE | `/exams/{id}` | Get / update / delete exam |
-| GET/POST | `/exams/{id}/questions` | List / create questions |
-| POST | `/exams/{id}/questions/bulk` | Bulk replace questions |
+| GET/PATCH | `/exams/{id}` | Get / update exam |
+| GET/POST | `/exams/{id}/questions` | List / bulk-create questions |
 | GET/POST | `/exams/{id}/answer-key` | Get / upsert answer key |
-| POST | `/exams/{id}/sheets/generate` | Generate PDF (CSV upload) |
+| POST | `/exams/{id}/sheets/generate` | Generate PDF (`?id_mode=qr\|bubble_grid\|both`) |
 | POST | `/exams/{id}/submissions` | Upload + process single image |
 | POST | `/exams/{id}/submissions/batch` | Batch image upload |
 | GET | `/exams/{id}/submissions` | List submissions |
 | POST | `/exams/{id}/submissions/{sid}/reprocess` | Reprocess from saved image |
 | GET | `/exams/{id}/results` | List results |
-| GET | `/exams/{id}/results/summary` | Stats + distribution |
+| GET | `/exams/{id}/results/summary` | Stats + score distribution |
+| GET | `/exams/{id}/results/{index}/detail` | Per-question breakdown for one candidate |
 | GET | `/exams/{id}/results/export` | CSV or XLSX download |
