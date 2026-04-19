@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ExamLayout } from "../components/layout/ExamLayout";
+import { examsApi } from "../api/exams";
 import { resultsApi, type Result, type ResultSummary } from "../api/results";
 import { ScoreChart } from "../components/results/ScoreChart";
 
@@ -9,14 +10,17 @@ export function ResultsPage() {
   const [results, setResults] = useState<Result[]>([]);
   const [summary, setSummary] = useState<ResultSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [passMark, setPassMark] = useState(50);
+  const [passMark, setPassMark] = useState<number | null>(null);
 
   const loadData = async () => {
     if (!id) return;
-    const [resData, sumData] = await Promise.all([
+    const [examRes, resData] = await Promise.all([
+      examsApi.get(id),
       resultsApi.list(id),
-      resultsApi.summary(id, passMark),
     ]);
+    const examPassMark = examRes.data.pass_mark ?? 50;
+    setPassMark(examPassMark);
+    const sumData = await resultsApi.summary(id, examPassMark);
     setResults(resData.data);
     setSummary(sumData.data);
     setLoading(false);
@@ -24,12 +28,20 @@ export function ResultsPage() {
 
   useEffect(() => { loadData(); }, [id]);
   useEffect(() => {
-    if (!loading) resultsApi.summary(id!, passMark).then((r) => setSummary(r.data));
+    if (!loading && passMark !== null) resultsApi.summary(id!, passMark).then((r) => setSummary(r.data));
   }, [passMark]);
 
-  const handleExport = (format: "csv" | "xlsx") => {
+  const handleExport = async (format: "csv" | "xlsx") => {
     if (!id) return;
-    window.location.href = resultsApi.exportUrl(id, format);
+    const res = await resultsApi.export(id, format);
+    const ext = format === "csv" ? "csv" : "xlsx";
+    const mime = format === "csv" ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const url = URL.createObjectURL(new Blob([res.data], { type: mime }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `results_${id.slice(0, 8)}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -61,12 +73,12 @@ export function ResultsPage() {
 
           <div style={styles.passMarkRow}>
             <label style={styles.passMarkLabel}>
-              Pass mark: {passMark}%
+              Pass mark: {passMark ?? 50}%
               <input
                 type="range"
                 min={0}
                 max={100}
-                value={passMark}
+                value={passMark ?? 50}
                 onChange={(e) => setPassMark(Number(e.target.value))}
                 style={styles.slider}
               />
@@ -108,8 +120,8 @@ export function ResultsPage() {
                       <td style={styles.td}>{r.score.toFixed(1)}</td>
                       <td style={styles.td}>{r.percentage.toFixed(1)}%</td>
                       <td style={styles.td}>
-                        <span style={{ ...styles.badge, ...(r.percentage >= passMark ? styles.pass : styles.fail) }}>
-                          {r.percentage >= passMark ? "PASS" : "FAIL"}
+                        <span style={{ ...styles.badge, ...(r.percentage >= (passMark ?? 50) ? styles.pass : styles.fail) }}>
+                          {r.percentage >= (passMark ?? 50) ? "PASS" : "FAIL"}
                         </span>
                       </td>
                     </tr>

@@ -22,21 +22,21 @@ export interface BatchResult {
 }
 
 export const submissionsApi = {
-  upload: (examId: string, file: File, digitCount: number = 8) => {
+  upload: (examId: string, file: File, digitCount: number = 8, digitOrientation: string = "vertical") => {
     const form = new FormData();
     form.append("file", file);
     return apiClient.post<Submission>(
-      `/exams/${examId}/submissions?digit_count=${digitCount}`,
+      `/exams/${examId}/submissions?digit_count=${digitCount}&digit_orientation=${digitOrientation}`,
       form,
       { headers: { "Content-Type": "multipart/form-data" } }
     );
   },
 
-  batchUpload: (examId: string, files: File[], digitCount: number = 8) => {
+  batchUpload: (examId: string, files: File[], digitCount: number = 8, digitOrientation: string = "vertical") => {
     const form = new FormData();
     for (const f of files) form.append("files", f);
     return apiClient.post<{ results: BatchResult[] }>(
-      `/exams/${examId}/submissions/batch?digit_count=${digitCount}`,
+      `/exams/${examId}/submissions/batch?digit_count=${digitCount}&digit_orientation=${digitOrientation}`,
       form,
       { headers: { "Content-Type": "multipart/form-data" } }
     );

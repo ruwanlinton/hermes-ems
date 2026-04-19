@@ -43,6 +43,7 @@ async def upload_submission(
     exam_id: str,
     file: UploadFile = File(...),
     digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in the bubble grid (for bubble_grid id sheets)"),
+    digit_orientation: str = Query("vertical", description="Digit grid orientation: 'vertical' or 'horizontal'"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_roles("admin", "creator", "marker")),
 ):
@@ -62,13 +63,15 @@ async def upload_submission(
         exam_id=exam_id,
         image_path=image_path,
         status="processing",
+        digit_count=digit_count,
+        digit_orientation=digit_orientation,
     )
     db.add(submission)
     await db.commit()
     await db.refresh(submission)
 
     # Process synchronously for single upload
-    submission = await process_submission(image_bytes, exam_id, submission, db, digit_count=digit_count)
+    submission = await process_submission(image_bytes, exam_id, submission, db, digit_count=digit_count, digit_orientation=digit_orientation)
     return submission
 
 
@@ -77,6 +80,7 @@ async def batch_upload_submissions(
     exam_id: str,
     files: List[UploadFile] = File(...),
     digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in the bubble grid (for bubble_grid id sheets)"),
+    digit_orientation: str = Query("vertical", description="Digit grid orientation: 'vertical' or 'horizontal'"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_roles("admin", "creator", "marker")),
 ):
@@ -100,12 +104,14 @@ async def batch_upload_submissions(
             exam_id=exam_id,
             image_path=image_path,
             status="processing",
+            digit_count=digit_count,
+            digit_orientation=digit_orientation,
         )
         db.add(submission)
         await db.commit()
         await db.refresh(submission)
 
-        submission = await process_submission(image_bytes, exam_id, submission, db, digit_count=digit_count)
+        submission = await process_submission(image_bytes, exam_id, submission, db, digit_count=digit_count, digit_orientation=digit_orientation)
         results.append({
             "filename": file.filename,
             "submission_id": submission.id,
@@ -122,7 +128,7 @@ async def batch_upload_submissions(
 async def list_submissions(
     exam_id: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles("admin", "creator", "marker")),
+    _: User = Depends(require_roles("admin", "creator", "marker", "viewer")),
 ):
     await _get_exam_or_404(exam_id, db)
     result = await db.execute(
@@ -138,7 +144,7 @@ async def get_submission(
     exam_id: str,
     submission_id: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles("admin", "creator", "marker")),
+    _: User = Depends(require_roles("admin", "creator", "marker", "viewer")),
 ):
     result = await db.execute(
         select(Submission).where(
@@ -156,7 +162,7 @@ async def get_submission_image(
     exam_id: str,
     submission_id: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles("admin", "creator", "marker")),
+    _: User = Depends(require_roles("admin", "creator", "marker", "viewer")),
 ):
     """Download the original scanned image for a submission."""
     result = await db.execute(
@@ -178,11 +184,10 @@ async def get_submission_image(
 async def reprocess_submission(
     exam_id: str,
     submission_id: str,
-    digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in the bubble grid (for bubble_grid id sheets)"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_roles("admin", "creator", "marker")),
 ):
-    """Reprocess a submission from its saved image file."""
+    """Reprocess a submission from its saved image file using the original digit grid settings."""
     result = await db.execute(
         select(Submission).where(
             Submission.id == submission_id, Submission.exam_id == exam_id
@@ -203,5 +208,9 @@ async def reprocess_submission(
     sub.error_message = None
     await db.commit()
 
-    sub = await process_submission(image_bytes, exam_id, sub, db, digit_count=digit_count)
+    sub = await process_submission(
+        image_bytes, exam_id, sub, db,
+        digit_count=sub.digit_count,
+        digit_orientation=sub.digit_orientation,
+    )
     return sub

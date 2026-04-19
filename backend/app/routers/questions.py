@@ -64,6 +64,8 @@ async def bulk_create_questions(
     questions = [Question(exam_id=exam_id, **q.model_dump()) for q in payload.questions]
     db.add_all(questions)
     exam.total_questions = len(questions)
+    if payload.questions:
+        exam.question_type = payload.questions[0].question_type
     await db.commit()
     result = await db.execute(
         select(Question)

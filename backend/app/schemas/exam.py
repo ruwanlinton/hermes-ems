@@ -5,24 +5,31 @@ from pydantic import BaseModel
 
 class ExamCreate(BaseModel):
     title: str
+    name: str
     exam_date: Optional[datetime] = None
     total_questions: int = 0
     status: str = "draft"
+    pass_mark: float = 50.0
 
 
 class ExamUpdate(BaseModel):
     title: Optional[str] = None
+    name: Optional[str] = None
     exam_date: Optional[datetime] = None
     total_questions: Optional[int] = None
     status: Optional[str] = None
+    pass_mark: Optional[float] = None
 
 
 class ExamOut(BaseModel):
     id: str
     title: str
+    name: Optional[str]
+    question_type: Optional[str]
     exam_date: Optional[datetime]
     total_questions: int
     status: str
+    pass_mark: float
     created_at: datetime
     updated_at: datetime
 

@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { ExamLayout } from "../components/layout/ExamLayout";
 import { examsApi, type Exam, type Question, type AnswerKey } from "../api/exams";
 import { useAuth, hasRole } from "../auth/AuthContext";
 
 export function ExamDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const canEditAnswerKey = hasRole(user, "admin", "creator");
+  const canEditPassMark = hasRole(user, "admin", "creator", "marker");
   const [exam, setExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answerKeys, setAnswerKeys] = useState<AnswerKey[]>([]);
@@ -15,6 +17,8 @@ export function ExamDetailPage() {
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editStatus, setEditStatus] = useState("");
+  const [editPassMark, setEditPassMark] = useState(50);
+  const [editingPassMark, setEditingPassMark] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -26,6 +30,7 @@ export function ExamDetailPage() {
       setExam(examRes.data);
       setEditTitle(examRes.data.title);
       setEditStatus(examRes.data.status);
+      setEditPassMark(examRes.data.pass_mark ?? 50);
       setQuestions(questionsRes.data);
       setAnswerKeys(akRes.data);
       setLoading(false);
@@ -37,6 +42,13 @@ export function ExamDetailPage() {
     const res = await examsApi.update(id, { title: editTitle, status: editStatus });
     setExam(res.data);
     setEditing(false);
+  };
+
+  const handleSavePassMark = async () => {
+    if (!id) return;
+    const res = await examsApi.update(id, { pass_mark: editPassMark });
+    setExam(res.data);
+    setEditingPassMark(false);
   };
 
   const handleAnswerKeyChange = (qId: string, field: "correct_option" | "sub_options", value: string | Record<string, boolean>) => {
@@ -58,9 +70,8 @@ export function ExamDetailPage() {
         correct_option: ak.correct_option ?? undefined,
         sub_options: ak.sub_options ?? undefined,
       }));
-    const res = await examsApi.upsertAnswerKey(id, payload);
-    setAnswerKeys(res.data);
-    alert("Answer key saved.");
+    await examsApi.upsertAnswerKey(id, payload);
+    navigate(0);
   };
 
   if (loading) return <ExamLayout><p>Loading...</p></ExamLayout>;
@@ -96,9 +107,35 @@ export function ExamDetailPage() {
       </div>
 
       <div style={styles.meta}>
+        {exam.name && <MetaItem label="Ref. Name" value={exam.name} />}
         <MetaItem label="Status" value={exam.status} />
         <MetaItem label="Questions" value={String(exam.total_questions)} />
         <MetaItem label="Date" value={exam.exam_date ? new Date(exam.exam_date).toLocaleDateString() : "—"} />
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 12, color: "#718096" }}>Pass Mark</div>
+          {canEditPassMark && editingPassMark ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={editPassMark}
+                onChange={(e) => setEditPassMark(Math.min(100, Math.max(0, Number(e.target.value))))}
+                style={{ width: 56, padding: "2px 6px", border: "1px solid #e2e8f0", borderRadius: 4, fontSize: 14, textAlign: "center" }}
+              />
+              <span style={{ fontSize: 12, color: "#718096" }}>%</span>
+              <button onClick={handleSavePassMark} style={{ ...styles.saveBtn, padding: "2px 8px", fontSize: 11 }}>Save</button>
+              <button onClick={() => { setEditingPassMark(false); setEditPassMark(exam.pass_mark ?? 50); }} style={{ ...styles.cancelBtn, padding: "2px 8px", fontSize: 11 }}>✕</button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}>
+              <span style={{ fontSize: 15, fontWeight: 600, color: "#2d3748" }}>{exam.pass_mark ?? 50}%</span>
+              {canEditPassMark && (
+                <button onClick={() => setEditingPassMark(true)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: 11, padding: "0 2px" }} title="Edit pass mark">✎</button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {!answerKeyComplete && questions.length > 0 && (
@@ -120,71 +157,141 @@ export function ExamDetailPage() {
       {questions.length > 0 && (
         <div style={styles.section}>
           <h2 style={styles.h2}>Answer Key</h2>
-          <div style={{ overflowX: "auto" }}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Q#</th>
-                  <th style={styles.th}>Type</th>
-                  <th style={styles.th}>Answer</th>
-                </tr>
-              </thead>
-              <tbody>
-                {questions.map((q) => {
-                  const ak = answerKeys.find((a) => a.question_id === q.id);
-                  return (
-                    <tr key={q.id} style={styles.tr}>
-                      <td style={styles.td}>{q.question_number}</td>
-                      <td style={styles.td}>{q.question_type}</td>
-                      <td style={styles.td}>
-                        {q.question_type === "type1" ? (
-                          <select
-                            value={ak?.correct_option || ""}
-                            onChange={(e) => handleAnswerKeyChange(q.id, "correct_option", e.target.value)}
-                            style={styles.akSelect}
-                            disabled={!canEditAnswerKey}
-                          >
-                            <option value="">— select —</option>
-                            {["A", "B", "C", "D", "E"].map((o) => (
-                              <option key={o} value={o}>{o}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div style={styles.t2row}>
-                            {["A", "B", "C", "D", "E"].map((opt) => (
-                              <label key={opt} style={styles.t2label}>
-                                {opt}:
-                                <select
-                                  value={ak?.sub_options?.[opt] === true ? "T" : ak?.sub_options?.[opt] === false ? "F" : ""}
-                                  onChange={(e) => {
-                                    const val = e.target.value === "T" ? true : e.target.value === "F" ? false : null;
-                                    const updated = { ...(ak?.sub_options || {}), [opt]: val };
-                                    handleAnswerKeyChange(q.id, "sub_options", updated as Record<string, boolean>);
-                                  }}
-                                  style={styles.t2Select}
-                                  disabled={!canEditAnswerKey}
-                                >
-                                  <option value="">—</option>
-                                  <option value="T">T</option>
-                                  <option value="F">F</option>
-                                </select>
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {questions[0].question_type === "type1" ? (
+            <Type1Grid
+              questions={questions}
+              answerKeys={answerKeys}
+              canEdit={canEditAnswerKey}
+              onChange={handleAnswerKeyChange}
+            />
+          ) : (
+            <Type2Grid
+              questions={questions}
+              answerKeys={answerKeys}
+              canEdit={canEditAnswerKey}
+              onChange={handleAnswerKeyChange}
+            />
+          )}
           {canEditAnswerKey && (
             <button onClick={handleSaveAnswerKey} style={styles.saveAkBtn}>Save Answer Key</button>
           )}
         </div>
       )}
     </ExamLayout>
+  );
+}
+
+const OPTIONS = ["A", "B", "C", "D", "E"];
+
+function Type1Grid({ questions, answerKeys, canEdit, onChange }: {
+  questions: { id: string; question_number: number; question_type: string }[];
+  answerKeys: { question_id: string; correct_option: string | null; sub_options: Record<string, boolean> | null }[];
+  canEdit: boolean;
+  onChange: (qId: string, field: "correct_option" | "sub_options", value: string | Record<string, boolean>) => void;
+}) {
+  const perCol = Math.ceil(questions.length / 3);
+  const cols = [questions.slice(0, perCol), questions.slice(perCol, perCol * 2), questions.slice(perCol * 2)];
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0 24px" }}>
+      {cols.map((col, ci) => (
+        <div key={ci}>
+          <div style={{ display: "grid", gridTemplateColumns: "28px 1fr", alignItems: "center", marginBottom: 4, paddingBottom: 4, borderBottom: "1px solid #e2e8f0" }}>
+            <span style={{ fontSize: 11, color: "#718096", fontWeight: 600 }}>Q</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              {OPTIONS.map((o) => <span key={o} style={{ width: 26, textAlign: "center", fontSize: 11, color: "#718096", fontWeight: 700 }}>{o}</span>)}
+            </div>
+          </div>
+          {col.map((q) => {
+            const ak = answerKeys.find((a) => a.question_id === q.id);
+            const selected = ak?.correct_option || "";
+            return (
+              <div key={q.id} style={{ display: "grid", gridTemplateColumns: "28px 1fr", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#4a5568" }}>{String(q.question_number).padStart(2, "0")}.</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {OPTIONS.map((o) => (
+                    <button
+                      key={o}
+                      onClick={() => canEdit && onChange(q.id, "correct_option", o)}
+                      style={{
+                        width: 26, height: 26, borderRadius: "50%", border: `2px solid ${selected === o ? "#233654" : "#cbd5e0"}`,
+                        background: selected === o ? "#233654" : "#fff", color: selected === o ? "#fff" : "#4a5568",
+                        fontWeight: 700, fontSize: 11, cursor: canEdit ? "pointer" : "default", padding: 0,
+                      }}
+                      disabled={!canEdit}
+                    >{o}</button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Type2Grid({ questions, answerKeys, canEdit, onChange }: {
+  questions: { id: string; question_number: number; question_type: string }[];
+  answerKeys: { question_id: string; correct_option: string | null; sub_options: Record<string, boolean> | null }[];
+  canEdit: boolean;
+  onChange: (qId: string, field: "correct_option" | "sub_options", value: string | Record<string, boolean>) => void;
+}) {
+  const perCol = Math.ceil(questions.length / 4);
+  const cols = [questions.slice(0, perCol), questions.slice(perCol, perCol * 2), questions.slice(perCol * 2, perCol * 3), questions.slice(perCol * 3)];
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0 16px" }}>
+      {cols.map((col, ci) => (
+        <div key={ci}>
+          <div style={{ display: "grid", gridTemplateColumns: "28px 1fr", alignItems: "center", marginBottom: 4, paddingBottom: 4, borderBottom: "1px solid #e2e8f0" }}>
+            <span style={{ fontSize: 11, color: "#718096", fontWeight: 600 }}>Q</span>
+            <div style={{ display: "flex", gap: 4 }}>
+              {OPTIONS.map((o) => <span key={o} style={{ width: 32, textAlign: "center", fontSize: 11, color: "#718096", fontWeight: 700 }}>{o}</span>)}
+            </div>
+          </div>
+          {col.map((q) => {
+            const ak = answerKeys.find((a) => a.question_id === q.id);
+            const subs = ak?.sub_options || {};
+            return (
+              <div key={q.id} style={{ marginBottom: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "28px 1fr", alignItems: "flex-start" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#4a5568", paddingTop: 2 }}>{String(q.question_number).padStart(2, "0")}.</span>
+                  <div>
+                    {["T", "F"].map((tf) => (
+                      <div key={tf} style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 1 }}>
+                        <span style={{ fontSize: 10, color: "#718096", fontWeight: 700, width: 8 }}>{tf}</span>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {OPTIONS.map((o) => {
+                            const current = subs[o] === true ? "T" : subs[o] === false ? "F" : "";
+                            const active = current === tf;
+                            return (
+                              <button
+                                key={o}
+                                onClick={() => {
+                                  if (!canEdit) return;
+                                  const val = active ? null : tf === "T";
+                                  const updated = { ...subs, [o]: val };
+                                  onChange(q.id, "sub_options", updated as Record<string, boolean>);
+                                }}
+                                style={{
+                                  width: 32, height: 18, borderRadius: 3, border: `1.5px solid ${active ? "#233654" : "#cbd5e0"}`,
+                                  background: active ? "#233654" : "#fff", color: active ? "#fff" : "#718096",
+                                  fontWeight: 700, fontSize: 9, cursor: canEdit ? "pointer" : "default", padding: 0,
+                                }}
+                                disabled={!canEdit}
+                              >{o}</button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -211,13 +318,5 @@ const styles: Record<string, React.CSSProperties> = {
   section: { background: "#fff", borderRadius: 8, padding: 24, marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.08)" },
   hint: { fontSize: 13, color: "#718096", marginBottom: 12 },
   link: { color: "#ba3c3c" },
-  table: { width: "100%", borderCollapse: "collapse" },
-  th: { padding: "10px 12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#718096", borderBottom: "1px solid #e2e8f0" },
-  tr: { borderBottom: "1px solid #f7fafc" },
-  td: { padding: "8px 12px", fontSize: 13 },
-  akSelect: { padding: "4px 8px", border: "1px solid #e2e8f0", borderRadius: 4, fontSize: 13 },
-  t2row: { display: "flex", gap: 8, flexWrap: "wrap" },
-  t2label: { display: "flex", alignItems: "center", gap: 4, fontSize: 12 },
-  t2Select: { padding: "2px 6px", border: "1px solid #e2e8f0", borderRadius: 4, fontSize: 12 },
   saveAkBtn: { marginTop: 16, padding: "8px 20px", background: "#ba3c3c", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 600 },
 };

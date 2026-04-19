@@ -31,9 +31,12 @@ class Exam(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    question_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     exam_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
     total_questions: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(50), default="draft")  # draft, active, closed
+    pass_mark: Mapped[float] = mapped_column(Float, default=50.0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
@@ -90,6 +93,8 @@ class Submission(Base):
     status: Mapped[str] = mapped_column(
         String(50), default="pending"
     )  # pending, processing, completed, error
+    digit_count: Mapped[int] = mapped_column(Integer, default=8, nullable=False, server_default="8")
+    digit_orientation: Mapped[str] = mapped_column(String(20), default="vertical", nullable=False, server_default="vertical")
     raw_answers: Mapped[Optional[dict]] = mapped_column(JSONB)
     error_stage: Mapped[Optional[str]] = mapped_column(String(50))
     error_message: Mapped[Optional[str]] = mapped_column(Text)

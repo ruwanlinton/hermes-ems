@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ExamLayout } from "../components/layout/ExamLayout";
 import { submissionsApi, type Submission } from "../api/submissions";
+import { useAuth, hasRole } from "../auth/AuthContext";
 
 export function SubmissionsPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const canDownload = hasRole(user, "admin", "creator", "marker");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [reprocessing, setReprocessing] = useState<string | null>(null);
@@ -23,11 +26,13 @@ export function SubmissionsPage() {
     setDownloading(sub.id);
     try {
       const res = await submissionsApi.downloadImage(id, sub.id);
-      const url = URL.createObjectURL(new Blob([res.data], { type: "image/jpeg" }));
+      const url = URL.createObjectURL(res.data as Blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `sheet_${sub.index_number || sub.id.slice(0, 8)}.jpg`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } finally {
       setDownloading(null);
@@ -93,19 +98,22 @@ export function SubmissionsPage() {
                 </td>
                 <td style={styles.td}>{new Date(sub.created_at).toLocaleString()}</td>
                 <td style={{ ...styles.td, display: "flex", gap: 6, alignItems: "center" }}>
-                  <button
-                    onClick={() => handleDownload(sub)}
-                    disabled={downloading === sub.id}
-                    style={styles.downloadBtn}
-                    title="Download scanned sheet"
-                  >
-                    {downloading === sub.id ? "..." : "Download"}
-                  </button>
-                  {sub.status === "error" && (
+                  {canDownload && (
+                    <button
+                      onClick={() => handleDownload(sub)}
+                      disabled={downloading === sub.id}
+                      style={styles.downloadBtn}
+                      title="Download scanned sheet"
+                    >
+                      {downloading === sub.id ? "..." : "Download"}
+                    </button>
+                  )}
+                  {canDownload && (
                     <button
                       onClick={() => handleReprocess(sub.id)}
                       disabled={reprocessing === sub.id}
                       style={styles.reprocessBtn}
+                      title="Re-run OMR pipeline on this sheet"
                     >
                       {reprocessing === sub.id ? "..." : "Reprocess"}
                     </button>

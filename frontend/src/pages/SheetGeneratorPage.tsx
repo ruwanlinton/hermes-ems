@@ -7,21 +7,25 @@ import { loadSettings } from "../settings";
 const ID_MODES = [
   {
     value: "qr",
-    label: "QR Code only",
+    label: "QR Code",
     desc: "Each sheet has a printed QR code identifying the candidate. One sheet per row in the CSV. Recommended for standard use.",
   },
   {
     value: "bubble_grid",
-    label: "Digit Bubble Grid only",
-    desc: "A single blank template is generated. Candidates fill in their numeric index number (up to 8 digits) by bubbling each digit. No CSV required.",
+    label: "Digit Bubble Grid",
+    desc: "A single blank template is generated. Candidates fill in their numeric index number (up to 10 digits) by bubbling each digit. No CSV required.",
   },
 ];
 
 export function SheetGeneratorPage() {
   const { id } = useParams<{ id: string }>();
-  const [idMode, setIdMode] = useState("qr");
+  const [idMode, setIdMode] = useState(() => loadSettings().defaultIdMode);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [digitCount, setDigitCount] = useState(() => loadSettings().defaultDigitCount);
+  const [digitOrientation, setDigitOrientation] = useState<"vertical" | "horizontal">(() => loadSettings().defaultDigitOrientation);
+  const [includeSubject, setIncludeSubject] = useState(true);
+  const [includeDate, setIncludeDate] = useState(true);
+  const [includeRegNo, setIncludeRegNo] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
 
@@ -33,7 +37,7 @@ export function SheetGeneratorPage() {
     setGenerating(true);
     setError("");
     try {
-      const res = await examsApi.generateSheets(id, idMode, csvFile ?? undefined, digitCount);
+      const res = await examsApi.generateSheets(id, idMode, csvFile ?? undefined, digitCount, digitOrientation, includeSubject, includeDate, includeRegNo);
       const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const a = document.createElement("a");
       a.href = url;
@@ -88,7 +92,7 @@ export function SheetGeneratorPage() {
 
         {/* CSV upload — only for qr / both modes */}
         {needsCsv && (
-          <div>
+          <div style={styles.infoBox}>
             <div style={styles.csvTemplate}>
               <strong>CSV format (one index number per row):</strong>
               <pre style={styles.pre}>{`index_number\n2024001\n2024002\n2024003`}</pre>
@@ -101,7 +105,7 @@ export function SheetGeneratorPage() {
               </a>
             </div>
 
-            <label style={styles.label}>
+            <label style={{ ...styles.digitLabel, marginTop: 10 }}>
               CSV File
               <input
                 type="file"
@@ -111,7 +115,7 @@ export function SheetGeneratorPage() {
               />
             </label>
 
-            {csvFile && <p style={styles.fileInfo}>Selected: {csvFile.name}</p>}
+            {csvFile && <p style={styles.fileInfo}>{csvFile.name}</p>}
           </div>
         )}
 
@@ -121,7 +125,7 @@ export function SheetGeneratorPage() {
             <div style={{ marginBottom: 10 }}>
               A single blank template sheet will be generated. Print as many copies as needed.
               Candidates must fill in each digit of their <strong>numeric</strong> index number,
-              zero-padded from the left (e.g. index number 1234 with 8 digits → fill 00001234).
+              zero-padded from the left (e.g. index number 1234 with 10 digits → fill 0000001234).
             </div>
             <label style={styles.digitLabel}>
               Number of digit columns
@@ -137,8 +141,43 @@ export function SheetGeneratorPage() {
                 <span style={styles.digitHint}>1 – 10 digits</span>
               </div>
             </label>
+            <label style={{ ...styles.digitLabel, marginTop: 10 }}>
+              Grid orientation
+              <div style={styles.digitRow}>
+                <select
+                  value={digitOrientation}
+                  onChange={(e) => setDigitOrientation(e.target.value as "vertical" | "horizontal")}
+                  style={{ padding: "4px 8px", border: "1px solid #d69e2e", borderRadius: 4, fontSize: 13 }}
+                >
+                  <option value="vertical">Vertical (digit positions across columns)</option>
+                  <option value="horizontal">Horizontal (digit positions down rows)</option>
+                </select>
+              </div>
+            </label>
           </div>
         )}
+
+        {/* Header fields */}
+        <div>
+          <p style={styles.sectionLabel}>Header Fields</p>
+          <div style={styles.checkGroup}>
+            {([
+              ["Subject", includeSubject, setIncludeSubject],
+              ["Date", includeDate, setIncludeDate],
+              ["Reg. No", includeRegNo, setIncludeRegNo],
+            ] as [string, boolean, (v: boolean) => void][]).map(([label, checked, setter]) => (
+              <label key={label} style={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) => setter(e.target.checked)}
+                  style={{ marginRight: 6 }}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
 
         {error && <div style={styles.error}>{error}</div>}
 
@@ -166,17 +205,19 @@ const styles: Record<string, React.CSSProperties> = {
   modeOptionSelected: { borderColor: "#233654", background: "#f0f4f9" },
   modeLabel: { fontSize: 14, fontWeight: 600, color: "#233654", marginBottom: 2 },
   modeDesc: { fontSize: 12, color: "#718096", lineHeight: 1.5 },
-  csvTemplate: { background: "#f7fafc", borderRadius: 6, padding: 16, fontSize: 13 },
-  pre: { background: "#edf2f7", borderRadius: 4, padding: 10, fontSize: 12, overflowX: "auto", marginTop: 8 },
-  templateLink: { color: "#233654", fontSize: 12, marginTop: 8, display: "inline-block" },
+  csvTemplate: { background: "#fef9ec", borderRadius: 6, padding: 12, fontSize: 13, color: "#744210" },
+  pre: { background: "#fffdf0", borderRadius: 4, padding: 10, fontSize: 12, overflowX: "auto", marginTop: 8, color: "#92400e" },
+  templateLink: { color: "#92400e", fontSize: 12, marginTop: 8, display: "inline-block", fontWeight: 600 },
   label: { display: "flex", flexDirection: "column", gap: 6, fontSize: 14, fontWeight: 600, color: "#2d3748", marginTop: 12 },
   fileInput: { marginTop: 4 },
-  fileInfo: { fontSize: 13, color: "#718096" },
+  fileInfo: { fontSize: 13, color: "#92400e", marginTop: 6 },
   infoBox: { background: "#fffbeb", border: "1px solid #f6d860", borderRadius: 6, padding: "12px 16px", fontSize: 13, color: "#744210", lineHeight: 1.6 },
   digitLabel: { display: "flex", flexDirection: "column" as const, gap: 6, fontWeight: 600, fontSize: 13 },
   digitRow: { display: "flex", alignItems: "center", gap: 10 },
   digitInput: { width: 64, padding: "4px 8px", border: "1px solid #d69e2e", borderRadius: 4, fontSize: 14, textAlign: "center" as const },
   digitHint: { fontSize: 12, color: "#92400e" },
+  checkGroup: { display: "flex", gap: 20, flexWrap: "wrap" as const, marginTop: 6 },
+  checkLabel: { display: "flex", alignItems: "center", fontSize: 13, fontWeight: 600, color: "#2d3748", cursor: "pointer" },
   error: { background: "#fff5f5", border: "1px solid #fc8181", color: "#c53030", padding: "10px 14px", borderRadius: 6, fontSize: 13 },
   btn: { padding: "10px 24px", background: "#233654", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: "pointer", alignSelf: "flex-start" },
   btnDisabled: { background: "#a0aec0", cursor: "not-allowed" },

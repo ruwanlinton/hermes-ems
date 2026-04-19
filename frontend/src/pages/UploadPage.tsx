@@ -16,6 +16,7 @@ export function UploadPage() {
   const [files, setFiles] = useState<FileStatus[]>([]);
   const [uploading, setUploading] = useState(false);
   const [digitCount, setDigitCount] = useState(() => loadSettings().defaultDigitCount);
+  const [digitOrientation, setDigitOrientation] = useState<"vertical" | "horizontal">(() => loadSettings().defaultDigitOrientation);
 
   const handleFiles = (newFiles: File[]) => {
     setFiles((prev) => [
@@ -37,7 +38,7 @@ export function UploadPage() {
         prev.map((f) => f.file === item.file ? { ...f, status: "uploading" } : f)
       );
       try {
-        const res = await submissionsApi.upload(id, item.file, digitCount);
+        const res = await submissionsApi.upload(id, item.file, digitCount, digitOrientation);
         setFiles((prev) =>
           prev.map((f) =>
             f.file === item.file
@@ -71,7 +72,7 @@ export function UploadPage() {
         prev.map((f) => f.status === "pending" ? { ...f, status: "uploading" } : f)
       );
       try {
-        const res = await submissionsApi.batchUpload(id, pending.map((f) => f.file), digitCount);
+        const res = await submissionsApi.batchUpload(id, pending.map((f) => f.file), digitCount, digitOrientation);
         const resultMap = new Map(res.data.results.map((r) => [r.filename, r]));
         setFiles((prev) =>
           prev.map((f) => {
@@ -105,7 +106,7 @@ export function UploadPage() {
 
       <div style={styles.settingsRow}>
         <label style={styles.digitLabel}>
-          Index digit columns (bubble grid sheets):
+          Index digit columns:
           <input
             type="number"
             min={1}
@@ -115,7 +116,18 @@ export function UploadPage() {
             style={styles.digitInput}
           />
         </label>
-        <span style={styles.digitHint}>Must match the digit count used when generating the sheets. Use 8 for QR-coded sheets.</span>
+        <label style={styles.digitLabel}>
+          Grid orientation:
+          <select
+            value={digitOrientation}
+            onChange={(e) => setDigitOrientation(e.target.value as "vertical" | "horizontal")}
+            style={{ padding: "4px 8px", border: "1px solid #cbd5e0", borderRadius: 4, fontSize: 13, marginLeft: 4 }}
+          >
+            <option value="vertical">Vertical</option>
+            <option value="horizontal">Horizontal</option>
+          </select>
+        </label>
+        <span style={styles.digitHint}>Must match the settings used when generating the sheets.</span>
       </div>
 
       <div style={styles.dropArea}>

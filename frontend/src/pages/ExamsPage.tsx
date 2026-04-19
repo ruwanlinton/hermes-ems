@@ -41,6 +41,7 @@ export function ExamsPage() {
           <thead>
             <tr>
               <th style={styles.th}>Title</th>
+              <th style={styles.th}>Type</th>
               <th style={styles.th}>Status</th>
               <th style={styles.th}>Questions</th>
               <th style={styles.th}>Date</th>
@@ -52,6 +53,12 @@ export function ExamsPage() {
               <tr key={exam.id} style={styles.tr}>
                 <td style={styles.td}>
                   <Link to={`/exams/${exam.id}`} style={styles.link}>{exam.title}</Link>
+                  {exam.name && <div style={{ fontSize: 11, color: "#718096", marginTop: 2 }}>{exam.name}</div>}
+                </td>
+                <td style={styles.td}>
+                  {exam.question_type
+                    ? <span style={{ fontSize: 12, color: "#4a5568" }}>{exam.question_type === "type1" ? "Type 1" : "Type 2"}</span>
+                    : <span style={{ fontSize: 12, color: "#cbd5e0" }}>—</span>}
                 </td>
                 <td style={styles.td}>
                   <span style={{ ...styles.badge, ...badgeColor(exam.status) }}>

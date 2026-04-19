@@ -80,12 +80,7 @@ def detect_type1_answers(
         if len(filled) == 1:
             answers[q_num] = filled[0]
         elif len(filled) > 1:
-            # Multiple filled — take the one with highest fill ratio
-            ratios = [
-                _fill_ratio(img_gray, _mm_cx(x_start, j), cy_px, r_px)
-                for j, opt in enumerate(OPTIONS_TYPE1)
-            ]
-            answers[q_num] = OPTIONS_TYPE1[int(np.argmax(ratios))]
+            answers[q_num] = "MULTIPLE"
         else:
             answers[q_num] = None
 
@@ -149,34 +144,60 @@ def detect_digit_grid(
     img_gray: np.ndarray,
     fill_threshold: float = 0.50,
     n_digits: int = ID_GRID_DIGIT_COUNT,
+    orientation: str = "vertical",
 ) -> Optional[str]:
     """
     Detect filled bubbles in the ID digit bubble grid.
     Returns a zero-padded numeric string (e.g. "00012345") or None if
-    any column has no filled bubble (ambiguous / unreadable).
+    any position has no filled bubble (ambiguous / unreadable).
+
+    orientation="vertical"   – columns=positions, rows=values 0-9 (default)
+    orientation="horizontal" – rows=positions, columns=values 0-9
     """
     r_px = mm_to_px(ID_GRID_BUBBLE_DIAMETER_MM / 2)
     n_digits = min(max(n_digits, 1), 10)
     digits = []
 
-    for col in range(n_digits):
-        cx_mm = ID_GRID_LEFT_MM + ID_GRID_LABEL_W_MM + ID_GRID_LABEL_GAP_MM + col * ID_GRID_CELL_W_MM
-        cx_px = mm_to_px(cx_mm)
-
-        best_digit = None
-        best_ratio = fill_threshold  # must exceed threshold to count
-
-        for row in range(10):
+    if orientation == "horizontal":
+        # Each row is a digit position; scan 10 columns (0–9) per row
+        for row in range(n_digits):
             cy_mm = ID_GRID_TOP_MM + ID_GRID_HEADER_H_MM + ID_GRID_HEADER_GAP_MM + row * ID_GRID_CELL_H_MM
             cy_px = mm_to_px(cy_mm)
-            ratio = _fill_ratio(img_gray, cx_px, cy_px, r_px)
-            if ratio > best_ratio:
-                best_ratio = ratio
-                best_digit = row
 
-        if best_digit is None:
-            return None
-        digits.append(str(best_digit))
+            best_digit = None
+            best_ratio = fill_threshold
+
+            for col in range(10):
+                cx_mm = ID_GRID_LEFT_MM + ID_GRID_LABEL_W_MM + ID_GRID_LABEL_GAP_MM + col * ID_GRID_CELL_W_MM
+                cx_px = mm_to_px(cx_mm)
+                ratio = _fill_ratio(img_gray, cx_px, cy_px, r_px)
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_digit = col  # column index == digit value
+
+            if best_digit is None:
+                return None
+            digits.append(str(best_digit))
+    else:
+        # Vertical (default): each column is a digit position; scan 10 rows (0–9)
+        for col in range(n_digits):
+            cx_mm = ID_GRID_LEFT_MM + ID_GRID_LABEL_W_MM + ID_GRID_LABEL_GAP_MM + col * ID_GRID_CELL_W_MM
+            cx_px = mm_to_px(cx_mm)
+
+            best_digit = None
+            best_ratio = fill_threshold
+
+            for row in range(10):
+                cy_mm = ID_GRID_TOP_MM + ID_GRID_HEADER_H_MM + ID_GRID_HEADER_GAP_MM + row * ID_GRID_CELL_H_MM
+                cy_px = mm_to_px(cy_mm)
+                ratio = _fill_ratio(img_gray, cx_px, cy_px, r_px)
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_digit = row
+
+            if best_digit is None:
+                return None
+            digits.append(str(best_digit))
 
     return "".join(digits)
 

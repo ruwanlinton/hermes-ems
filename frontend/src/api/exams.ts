@@ -3,9 +3,12 @@ import { apiClient } from "./client";
 export interface Exam {
   id: string;
   title: string;
+  name: string | null;
+  question_type: string | null;
   exam_date: string | null;
   total_questions: number;
   status: string;
+  pass_mark: number;
   created_at: string;
   updated_at: string;
 }
@@ -27,9 +30,11 @@ export interface AnswerKey {
 
 export interface ExamCreate {
   title: string;
+  name: string;
   exam_date?: string;
   total_questions?: number;
   status?: string;
+  pass_mark?: number;
 }
 
 export interface QuestionCreate {
@@ -58,8 +63,24 @@ export const examsApi = {
     answers: { question_id: string; correct_option?: string; sub_options?: Record<string, boolean> }[]
   ) => apiClient.post<AnswerKey[]>(`/exams/${examId}/answer-key`, { answers }),
 
-  generateSheets: (examId: string, idMode: string, csvFile?: File, digitCount: number = 8) => {
-    const params = new URLSearchParams({ id_mode: idMode, digit_count: String(digitCount) });
+  generateSheets: (
+    examId: string,
+    idMode: string,
+    csvFile?: File,
+    digitCount: number = 8,
+    digitOrientation: string = "vertical",
+    includeSubject: boolean = true,
+    includeDate: boolean = true,
+    includeRegNo: boolean = true,
+  ) => {
+    const params = new URLSearchParams({
+      id_mode: idMode,
+      digit_count: String(digitCount),
+      digit_orientation: digitOrientation,
+      include_subject: String(includeSubject),
+      include_date: String(includeDate),
+      include_reg_no: String(includeRegNo),
+    });
     if (csvFile) {
       const form = new FormData();
       form.append("csv_file", csvFile);

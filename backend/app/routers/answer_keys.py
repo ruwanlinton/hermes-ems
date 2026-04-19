@@ -10,7 +10,7 @@ from app.schemas.exam import AnswerKeyBulk, AnswerKeyOut
 
 router = APIRouter()
 
-_marker_plus = require_roles("admin", "creator", "marker")
+_any_role = require_roles("admin", "creator", "marker", "viewer")
 _creator_plus = require_roles("admin", "creator")
 
 
@@ -18,7 +18,7 @@ _creator_plus = require_roles("admin", "creator")
 async def get_answer_key(
     exam_id: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(_marker_plus),
+    _: User = Depends(_any_role),
 ):
     result = await db.execute(select(Exam).where(Exam.id == exam_id))
     if not result.scalar_one_or_none():

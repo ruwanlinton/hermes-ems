@@ -19,9 +19,13 @@ async def generate_sheets(
     exam_id: str,
     id_mode: str = Query("qr", description="'qr' | 'bubble_grid' | 'both'"),
     digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in bubble grid (1–10, bubble_grid mode only)"),
+    digit_orientation: str = Query("vertical", description="Digit grid orientation: 'vertical' or 'horizontal'"),
+    include_subject: bool = Query(True, description="Include Subject field in header"),
+    include_date: bool = Query(True, description="Include Date field in header"),
+    include_reg_no: bool = Query(True, description="Include Reg. No field in header"),
     csv_file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles("admin", "creator")),
+    _: User = Depends(require_roles("admin", "creator", "marker", "viewer")),
 ):
     """Generate OMR answer sheets PDF.
 
@@ -74,6 +78,10 @@ async def generate_sheets(
         type2_questions=type2,
         id_mode=id_mode,
         digit_count=digit_count,
+        digit_orientation=digit_orientation,
+        include_subject=include_subject,
+        include_date=include_date,
+        include_reg_no=include_reg_no,
     )
 
     filename = f"omr_sheets_{exam_id[:8]}.pdf"

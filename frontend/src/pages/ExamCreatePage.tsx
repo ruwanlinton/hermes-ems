@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "../components/layout/Layout";
 import { examsApi, type QuestionCreate } from "../api/exams";
+import { loadSettings } from "../settings";
 
 type Step = "metadata" | "questions" | "answer-key";
 
 interface MetaForm {
   title: string;
-  exam_date: string;
+  name: string;
   status: string;
 }
 
@@ -15,7 +16,8 @@ export function ExamCreatePage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>("metadata");
   const [examId, setExamId] = useState<string | null>(null);
-  const [meta, setMeta] = useState<MetaForm>({ title: "", exam_date: "", status: "draft" });
+  const [meta, setMeta] = useState<MetaForm>({ title: "", name: "", status: "draft" });
+  const defaultPassMark = loadSettings().defaultPassMark;
   const [questionType, setQuestionType] = useState<"type1" | "type2">("type1");
   const [questionCount, setQuestionCount] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -28,8 +30,10 @@ export function ExamCreatePage() {
     try {
       const res = await examsApi.create({
         title: meta.title,
-        exam_date: meta.exam_date || undefined,
+        name: meta.name,
+        exam_date: new Date().toISOString().slice(0, 10),
         status: meta.status,
+        pass_mark: defaultPassMark,
       });
       setExamId(res.data.id);
       setStep("questions");
@@ -81,6 +85,16 @@ export function ExamCreatePage() {
       {step === "metadata" && (
         <form onSubmit={handleMetaSubmit} style={styles.form}>
           <label style={styles.label}>
+            Reference Name *
+            <input
+              required
+              value={meta.name}
+              onChange={(e) => setMeta({ ...meta, name: e.target.value })}
+              style={styles.input}
+              placeholder="e.g. SLMC-2024-A (for internal tracking)"
+            />
+          </label>
+          <label style={styles.label}>
             Exam Title *
             <input
               required
@@ -88,15 +102,6 @@ export function ExamCreatePage() {
               onChange={(e) => setMeta({ ...meta, title: e.target.value })}
               style={styles.input}
               placeholder="e.g. SLMC Licensing Examination 2024"
-            />
-          </label>
-          <label style={styles.label}>
-            Exam Date
-            <input
-              type="date"
-              value={meta.exam_date}
-              onChange={(e) => setMeta({ ...meta, exam_date: e.target.value })}
-              style={styles.input}
             />
           </label>
           <label style={styles.label}>

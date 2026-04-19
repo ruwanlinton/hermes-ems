@@ -1,5 +1,4 @@
 import { apiClient } from "./client";
-import { API_BASE_URL } from "../auth/authConfig";
 
 export interface Result {
   id: string;
@@ -52,6 +51,9 @@ export const resultsApi = {
   detail: (examId: string, indexNumber: string) =>
     apiClient.get<ResultDetail>(`/exams/${examId}/results/${encodeURIComponent(indexNumber)}/detail`),
 
-  exportUrl: (examId: string, format: "csv" | "xlsx") =>
-    `${API_BASE_URL}/api/v1/exams/${examId}/results/export?format=${format}`,
+  export: (examId: string, format: "csv" | "xlsx") =>
+    apiClient.get(`/exams/${examId}/results/export`, {
+      params: { format },
+      responseType: "blob",
+    }),
 };

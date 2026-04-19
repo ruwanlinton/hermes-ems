@@ -78,41 +78,104 @@ def _draw_qr(c: canvas.Canvas, exam_id: str, index_number: str) -> None:
     )
 
 
-def _draw_id_digit_grid(c: canvas.Canvas, n_digits: int = ID_GRID_DIGIT_COUNT) -> None:
-    """Draw a digit bubble grid for manual index number entry (right side of header)."""
+def _draw_id_digit_grid(
+    c: canvas.Canvas,
+    n_digits: int = ID_GRID_DIGIT_COUNT,
+    orientation: str = "vertical",
+) -> None:
+    """Draw a digit bubble grid for manual index number entry (right side of header).
+
+    orientation="vertical"   – columns = digit positions, rows = digit values 0-9 (default)
+    orientation="horizontal" – rows = digit positions, columns = digit values 0-9
+    """
     x0 = ID_GRID_LEFT_MM
     y0 = ID_GRID_TOP_MM
     n = min(max(n_digits, 1), 10)
     r_pt = _mm_to_pt(ID_GRID_BUBBLE_DIAMETER_MM / 2)
 
-    # Title label
     c.setFillColor(colors.black)
-    c.setFont("Helvetica-Bold", 6)
-    c.drawString(_mm_to_pt(x0), _y(y0 - 2), "INDEX NUMBER")
+    c.setFont("Helvetica-Bold", 7.9)
+    c.drawString(_mm_to_pt(x0), _y(y0 - 6), "INDEX NUMBER")
 
-    # Column-position headers (1, 2, … n)
-    for col in range(n):
-        cx_mm = x0 + ID_GRID_LABEL_W_MM + ID_GRID_LABEL_GAP_MM + col * ID_GRID_CELL_W_MM
-        c.setFillColor(colors.black)
-        c.setFont("Helvetica-Bold", 6)
-        c.drawCentredString(_mm_to_pt(cx_mm), _y(y0 + ID_GRID_HEADER_H_MM - 1), str(col + 1))
+    # Instruction text
+    c.setFont("Helvetica", 6.0)
+    if orientation == "horizontal":
+        c.drawString(_mm_to_pt(x0), _y(y0 - 4), "Write each digit in the box to the left.")
+        c.drawString(_mm_to_pt(x0), _y(y0 - 2.2), "Fill the matching bubble in the same row.")
+    else:
+        c.drawString(_mm_to_pt(x0), _y(y0 - 4), "Write each digit in the box above its column.")
+        c.drawString(_mm_to_pt(x0), _y(y0 - 2.2), "Fill the matching bubble in the same column.")
 
-    # Rows 0–9
-    for row in range(10):
-        cy_mm = y0 + ID_GRID_HEADER_H_MM + ID_GRID_HEADER_GAP_MM + row * ID_GRID_CELL_H_MM
+    # Writing box dimensions
+    box_w_v_mm = ID_GRID_CELL_W_MM - 1.0   # vertical: box width per column
+    box_h_v_mm = ID_GRID_HEADER_H_MM - 1.0  # vertical: box height in header row
+    box_w_h_mm = ID_GRID_LABEL_W_MM - 1.5   # horizontal: box width in label column
+    box_h_h_mm = ID_GRID_CELL_H_MM - 1.0    # horizontal: box height per row
 
-        # Digit label
-        c.setFillColor(colors.black)
-        c.setFont("Helvetica-Bold", 6)
-        c.drawRightString(_mm_to_pt(x0 + ID_GRID_LABEL_W_MM - 1), _y(cy_mm + 0.8), str(row))
-
-        # Bubbles for each digit position
-        for col in range(n):
+    if orientation == "horizontal":
+        # Rows = digit positions (1..n), Columns = digit values (0..9)
+        # Column headers: 0–9
+        for col in range(10):
             cx_mm = x0 + ID_GRID_LABEL_W_MM + ID_GRID_LABEL_GAP_MM + col * ID_GRID_CELL_W_MM
+            c.setFillColor(colors.black)
+            c.setFont("Helvetica-Bold", 7.9)
+            c.drawCentredString(_mm_to_pt(cx_mm), _y(y0 + ID_GRID_HEADER_H_MM - 1), str(col))
+
+        for row in range(n):
+            cy_mm = y0 + ID_GRID_HEADER_H_MM + ID_GRID_HEADER_GAP_MM + row * ID_GRID_CELL_H_MM
+
+            # Writing box on the left replacing the position number
+            box_top_mm = cy_mm - box_h_h_mm / 2
             c.setFillColor(colors.white)
             c.setStrokeColor(colors.black)
-            c.setLineWidth(0.4)
-            c.circle(_mm_to_pt(cx_mm), _y(cy_mm), r_pt, stroke=1, fill=0)
+            c.setLineWidth(0.5)
+            c.rect(
+                _mm_to_pt(x0 + 0.5),
+                _y(box_top_mm + box_h_h_mm),
+                _mm_to_pt(box_w_h_mm),
+                _mm_to_pt(box_h_h_mm),
+                stroke=1, fill=1,
+            )
+
+            # Bubbles for each digit value 0–9
+            for col in range(10):
+                cx_mm = x0 + ID_GRID_LABEL_W_MM + ID_GRID_LABEL_GAP_MM + col * ID_GRID_CELL_W_MM
+                c.setFillColor(colors.white)
+                c.setStrokeColor(colors.black)
+                c.setLineWidth(0.4)
+                c.circle(_mm_to_pt(cx_mm), _y(cy_mm), r_pt, stroke=1, fill=0)
+    else:
+        # Vertical (default): columns = digit positions, rows = digit values 0–9
+        # Writing boxes at top of each column, replacing position number
+        box_top_mm = y0 + 0.5
+        for col in range(n):
+            cx_mm = x0 + ID_GRID_LABEL_W_MM + ID_GRID_LABEL_GAP_MM + col * ID_GRID_CELL_W_MM
+            box_left_mm = cx_mm - box_w_v_mm / 2
+            c.setFillColor(colors.white)
+            c.setStrokeColor(colors.black)
+            c.setLineWidth(0.5)
+            c.rect(
+                _mm_to_pt(box_left_mm),
+                _y(box_top_mm + box_h_v_mm),
+                _mm_to_pt(box_w_v_mm),
+                _mm_to_pt(box_h_v_mm),
+                stroke=1, fill=1,
+            )
+
+        # Rows 0–9
+        for row in range(10):
+            cy_mm = y0 + ID_GRID_HEADER_H_MM + ID_GRID_HEADER_GAP_MM + row * ID_GRID_CELL_H_MM
+
+            c.setFillColor(colors.black)
+            c.setFont("Helvetica-Bold", 7.9)
+            c.drawRightString(_mm_to_pt(x0 + ID_GRID_LABEL_W_MM - 1), _y(cy_mm + 0.8), str(row))
+
+            for col in range(n):
+                cx_mm = x0 + ID_GRID_LABEL_W_MM + ID_GRID_LABEL_GAP_MM + col * ID_GRID_CELL_W_MM
+                c.setFillColor(colors.white)
+                c.setStrokeColor(colors.black)
+                c.setLineWidth(0.4)
+                c.circle(_mm_to_pt(cx_mm), _y(cy_mm), r_pt, stroke=1, fill=0)
 
 
 def _wrap_text(text: str, max_chars: int = 50) -> list[str]:
@@ -138,34 +201,46 @@ def _draw_fillable_fields(
     x_left_mm: float,
     x_right_mm: float,
     y_start_mm: float,
+    include_subject: bool = True,
+    include_date: bool = True,
+    include_reg_no: bool = True,
 ) -> float:
-    """Draw Subject / Date / Registration Number fillable lines.
-    Returns the y_mm position below the last field."""
+    """Draw optional Subject / Date / Reg. No fillable lines.
+    Returns the y_mm position below the last drawn field."""
     label_font_size = 8
     line_w = 0.4
-    row_gap = 7.5  # mm between field rows
+    row_gap = 6.5  # mm between field rows
 
-    fields = [
-        ("Subject:", x_left_mm, x_right_mm, y_start_mm),
-        ("Date:", x_left_mm, x_left_mm + (x_right_mm - x_left_mm) * 0.45, y_start_mm + row_gap),
-        ("Reg. No:", x_left_mm + (x_right_mm - x_left_mm) * 0.52, x_right_mm, y_start_mm + row_gap),
-    ]
-
-    for label, lx, rx, fy in fields:
+    def _draw_field(label: str, lx: float, rx: float, fy: float) -> None:
         c.setFillColor(colors.black)
         c.setFont("Helvetica-Bold", label_font_size)
         c.drawString(_mm_to_pt(lx), _y(fy + 1.0), label)
-
-        # underline starting after the label text
         label_w_pt = c.stringWidth(label, "Helvetica-Bold", label_font_size)
         line_x0 = _mm_to_pt(lx) + label_w_pt + _mm_to_pt(1.5)
         line_x1 = _mm_to_pt(rx)
-        line_y = _y(fy + 1.0) - 1.5  # slightly below baseline
+        line_y = _y(fy + 1.0) - 1.5
         c.setLineWidth(line_w)
         c.setStrokeColor(colors.black)
         c.line(line_x0, line_y, line_x1, line_y)
 
-    return y_start_mm + row_gap + 6
+    y = y_start_mm
+    if include_subject:
+        _draw_field("Subject:", x_left_mm, x_right_mm, y)
+        y += row_gap
+
+    if include_date and include_reg_no:
+        mid = x_left_mm + (x_right_mm - x_left_mm) * 0.45
+        _draw_field("Date:", x_left_mm, mid, y)
+        _draw_field("Reg. No:", x_left_mm + (x_right_mm - x_left_mm) * 0.52, x_right_mm, y)
+        y += row_gap
+    elif include_date:
+        _draw_field("Date:", x_left_mm, x_right_mm, y)
+        y += row_gap
+    elif include_reg_no:
+        _draw_field("Reg. No:", x_left_mm, x_right_mm, y)
+        y += row_gap
+
+    return y
 
 
 def _draw_header(
@@ -174,6 +249,9 @@ def _draw_header(
     index_number: str,
     exam_date: str,
     grid_mode: bool = False,
+    include_subject: bool = True,
+    include_date: bool = True,
+    include_reg_no: bool = True,
 ) -> None:
     c.setFillColor(colors.black)
 
@@ -185,44 +263,42 @@ def _draw_header(
         top_y = ID_GRID_TOP_MM
 
         c.setFont("Helvetica-Bold", 11)
-        c.drawCentredString(center_x, _y(top_y + 5), "SRI LANKA MEDICAL COUNCIL")
+        c.drawCentredString(center_x, _y(top_y - 4), "SRI LANKA MEDICAL COUNCIL")
 
         c.setFont("Helvetica-Bold", 9)
         for i, line in enumerate(title_lines):
-            c.drawCentredString(center_x, _y(top_y + 13 + i * title_line_h_mm), line)
+            c.drawCentredString(center_x, _y(top_y + 4 + i * title_line_h_mm), line)
         extra = (len(title_lines) - 1) * title_line_h_mm
 
         fields_end_y = _draw_fillable_fields(
-            c, HEADER_LEFT_MM, 120.0, top_y + 21 + extra
+            c, HEADER_LEFT_MM, 120.0, top_y + 12 + extra,
+            include_subject=include_subject, include_date=include_date, include_reg_no=include_reg_no,
         )
-        sep_y = max(fields_end_y, top_y + 45 + extra)
-        c.setLineWidth(0.5)
-        c.line(_mm_to_pt(HEADER_LEFT_MM), _y(sep_y), _mm_to_pt(HEADER_RIGHT_MM), _y(sep_y))
     else:
         # Left-pane layout mirroring grid_mode — QR occupies the right pane
         center_x = _mm_to_pt(75)  # centre of left pane (25–125mm)
         top_y = QR_TOP_MM  # align with QR top
 
         c.setFont("Helvetica-Bold", 11)
-        c.drawCentredString(center_x, _y(top_y + 5), "SRI LANKA MEDICAL COUNCIL")
+        c.drawCentredString(center_x, _y(top_y - 4), "SRI LANKA MEDICAL COUNCIL")
 
         c.setFont("Helvetica-Bold", 9)
         for i, line in enumerate(title_lines):
-            c.drawCentredString(center_x, _y(top_y + 13 + i * title_line_h_mm), line)
+            c.drawCentredString(center_x, _y(top_y + 4 + i * title_line_h_mm), line)
         extra = (len(title_lines) - 1) * title_line_h_mm
 
         # Pre-printed index number (personalised sheet)
         if index_number:
             c.setFont("Helvetica-Oblique", 8)
-            c.drawCentredString(center_x, _y(top_y + 20 + extra), f"Index No: {index_number}")
-            fields_start_y = top_y + 26 + extra
+            c.drawCentredString(center_x, _y(top_y + 11 + extra), f"Index No: {index_number}")
+            fields_start_y = top_y + 17 + extra
         else:
-            fields_start_y = top_y + 21 + extra
+            fields_start_y = top_y + 12 + extra
 
-        fields_end_y = _draw_fillable_fields(c, HEADER_LEFT_MM, 120.0, fields_start_y)
-        sep_y = max(fields_end_y, top_y + 45 + extra)
-        c.setLineWidth(0.5)
-        c.line(_mm_to_pt(HEADER_LEFT_MM), _y(sep_y), _mm_to_pt(HEADER_RIGHT_MM), _y(sep_y))
+        fields_end_y = _draw_fillable_fields(
+            c, HEADER_LEFT_MM, 120.0, fields_start_y,
+            include_subject=include_subject, include_date=include_date, include_reg_no=include_reg_no,
+        )
 
 
 def _draw_bubble(c: canvas.Canvas, cx_mm: float, cy_mm: float, filled: bool = False) -> None:
@@ -250,11 +326,11 @@ def _draw_section_a(
     if not type1_questions:
         return SECTION_A_TOP_MM
 
-    c.setFont("Helvetica-Bold", 10)
+    c.setFont("Helvetica-Bold", 8)
     c.drawString(
         _mm_to_pt(SECTION_A_LEFT_MM),
         _y(SECTION_A_TOP_MM - 6),
-        "SECTION A — Single Best Answer (circle ONE option per question)",
+        "Single Best Answer (circle ONE option per question)",
     )
 
     questions_per_col = math.ceil(len(type1_questions) / 3)
@@ -308,11 +384,11 @@ def _draw_section_b(
     """Draw Type 2 True/False grid in 3 columns. Returns y_mm below last block."""
     import math
 
-    c.setFont("Helvetica-Bold", 10)
+    c.setFont("Helvetica-Bold", 8)
     c.drawString(
         _mm_to_pt(SECTION_B_LEFT_MM),
         _y(start_y_mm - 6),
-        "SECTION B — Extended True/False (mark T or F for each sub-option)",
+        "Extended True/False (mark T or F for each sub-option)",
     )
 
     if not type2_questions:
@@ -354,7 +430,7 @@ def _draw_section_b(
 
         # Draw T and F rows (T at +2.5mm, F at +6.5mm within block)
         for ri, label in enumerate(SECTION_B_ROW_LABELS):
-            y_center = y_top + 2.5 + ri * 4.0
+            y_center = y_top + 2.5 + ri * 5.0
 
             # Row label (T or F)
             c.setFillColor(colors.black)
@@ -396,6 +472,10 @@ def generate_sheet(
     type2_questions: list[dict],
     id_mode: str = "qr",
     digit_count: int = ID_GRID_DIGIT_COUNT,
+    digit_orientation: str = "vertical",
+    include_subject: bool = True,
+    include_date: bool = True,
+    include_reg_no: bool = True,
 ) -> bytes:
     """Generate a single OMR answer sheet PDF and return as bytes.
 
@@ -413,12 +493,13 @@ def generate_sheet(
         _draw_qr(c, exam_id, index_number)
     elif id_mode == "both":
         _draw_qr(c, exam_id, index_number)
-        _draw_id_digit_grid(c, digit_count)
+        _draw_id_digit_grid(c, digit_count, digit_orientation)
     elif id_mode == "bubble_grid":
-        _draw_id_digit_grid(c, digit_count)
+        _draw_id_digit_grid(c, digit_count, digit_orientation)
 
     header_index = index_number if id_mode != "bubble_grid" else ""
-    _draw_header(c, exam_title, header_index, exam_date, grid_mode=(id_mode == "bubble_grid"))
+    _draw_header(c, exam_title, header_index, exam_date, grid_mode=(id_mode == "bubble_grid"),
+                 include_subject=include_subject, include_date=include_date, include_reg_no=include_reg_no)
 
     y_after_a = _draw_section_a(c, type1_questions)
 
@@ -441,6 +522,10 @@ def generate_batch_pdf(
     type2_questions: list[dict],
     id_mode: str = "qr",
     digit_count: int = ID_GRID_DIGIT_COUNT,
+    digit_orientation: str = "vertical",
+    include_subject: bool = True,
+    include_date: bool = True,
+    include_reg_no: bool = True,
 ) -> bytes:
     """Generate a multi-page PDF with one sheet per index number.
 
@@ -462,12 +547,13 @@ def generate_batch_pdf(
             _draw_qr(c, exam_id, index_number)
         elif id_mode == "both":
             _draw_qr(c, exam_id, index_number)
-            _draw_id_digit_grid(c, digit_count)
+            _draw_id_digit_grid(c, digit_count, digit_orientation)
         elif id_mode == "bubble_grid":
-            _draw_id_digit_grid(c, digit_count)
+            _draw_id_digit_grid(c, digit_count, digit_orientation)
 
         header_index = index_number if id_mode != "bubble_grid" else ""
-        _draw_header(c, exam_title, header_index, exam_date, grid_mode=(id_mode == "bubble_grid"))
+        _draw_header(c, exam_title, header_index, exam_date, grid_mode=(id_mode == "bubble_grid"),
+                     include_subject=include_subject, include_date=include_date, include_reg_no=include_reg_no)
 
         y_after_a = _draw_section_a(c, type1_questions)
         if type2_questions:

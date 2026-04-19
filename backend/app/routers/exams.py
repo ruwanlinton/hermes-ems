@@ -12,6 +12,7 @@ router = APIRouter()
 
 _any_role = require_roles("admin", "creator", "marker", "viewer")
 _creator_plus = require_roles("admin", "creator")
+_marker_plus = require_roles("admin", "creator", "marker")
 
 
 @router.get("/exams", response_model=List[ExamOut])
@@ -54,7 +55,7 @@ async def update_exam(
     exam_id: str,
     payload: ExamUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(_creator_plus),
+    _: User = Depends(_marker_plus),
 ):
     result = await db.execute(select(Exam).where(Exam.id == exam_id))
     exam = result.scalar_one_or_none()

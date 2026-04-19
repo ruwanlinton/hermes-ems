@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { examsApi, type Exam, type Question, type AnswerKey } from "../../api/exams";
+import { useAuth, hasRole } from "../../auth/AuthContext";
 
 interface Tab {
   label: string;
@@ -17,6 +18,8 @@ interface ExamLayoutProps {
 export function ExamLayout({ children }: ExamLayoutProps) {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const { user } = useAuth();
+  const canUpload = hasRole(user, "admin", "creator", "marker");
   const [exam, setExam] = useState<Exam | null>(null);
   const [answerKeyComplete, setAnswerKeyComplete] = useState(false);
   const [hasQuestions, setHasQuestions] = useState(false);
@@ -48,7 +51,7 @@ export function ExamLayout({ children }: ExamLayoutProps) {
   const tabs: Tab[] = [
     { label: "Overview", to: `/exams/${id}`, exact: true },
     { label: "Generate Sheets", to: `/exams/${id}/sheets` },
-    { label: "Upload Submissions", to: `/exams/${id}/upload`, locked: hasQuestions && !answerKeyComplete },
+    ...(canUpload ? [{ label: "Upload Submissions", to: `/exams/${id}/upload`, locked: hasQuestions && !answerKeyComplete }] : []),
     { label: "Submissions", to: `/exams/${id}/submissions`, locked: hasQuestions && !answerKeyComplete },
     { label: "Results", to: `/exams/${id}/results`, locked: hasQuestions && !answerKeyComplete },
   ];

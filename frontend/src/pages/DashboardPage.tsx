@@ -52,7 +52,13 @@ export function DashboardPage() {
                   <span style={{ ...styles.badge, ...statusBadge(exam.status) }}>
                     {exam.status}
                   </span>
+                  {exam.question_type && (
+                    <span style={styles.typeBadge}>
+                      {exam.question_type === "type1" ? "Type 1" : "Type 2"}
+                    </span>
+                  )}
                 </div>
+                {exam.name && <div style={styles.examName}>{exam.name}</div>}
                 <div style={styles.examMeta}>
                   {exam.total_questions} questions •{" "}
                   {exam.exam_date ? new Date(exam.exam_date).toLocaleDateString() : "No date set"}
@@ -124,6 +130,8 @@ const styles: Record<string, React.CSSProperties> = {
     borderLeft: "3px solid #b79a62",
   },
   examTitle: { fontWeight: 600, color: "#233654" },
+  examName: { fontSize: 12, color: "#718096", fontWeight: 500, marginTop: 2 },
   badge: { fontSize: 11, padding: "2px 8px", borderRadius: 99, fontWeight: 600 },
+  typeBadge: { fontSize: 11, padding: "2px 8px", borderRadius: 99, fontWeight: 600, background: "#e8f0fe", color: "#2b4acb" },
   examMeta: { fontSize: 13, color: "#718096", marginTop: 4 },
 };

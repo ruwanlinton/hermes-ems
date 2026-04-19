@@ -78,13 +78,21 @@ function QuestionRow({ q }: { q: QuestionDetail }) {
   if (q.question_type === "type1") {
     const marked = q.marked as string | null;
     const correct = q.correct as string | null;
+    const markedStyle = !marked
+      ? styles.optionNone
+      : marked === "MULTIPLE"
+      ? { ...styles.optionBadge, ...styles.optMultiple }
+      : { ...styles.optionBadge, ...(marked === correct ? styles.optCorrect : styles.optWrong) };
+
+    const markedLabel = !marked ? "—" : marked === "MULTIPLE" ? "Multiple" : marked;
+
     return (
       <tr style={styles.tr}>
         <td style={styles.td}>{q.question_number}</td>
         <td style={styles.td}><span style={styles.typeBadge}>T1</span></td>
         <td style={styles.td}>
-          <span style={marked ? { ...styles.optionBadge, ...(marked === correct ? styles.optCorrect : styles.optWrong) } : styles.optionNone}>
-            {marked ?? "—"}
+          <span style={markedStyle}>
+            {markedLabel}
           </span>
         </td>
         <td style={styles.td}>
@@ -156,6 +164,7 @@ const styles: Record<string, React.CSSProperties> = {
   optionBadge: { padding: "2px 10px", borderRadius: 4, fontSize: 13, fontWeight: 700, background: "#edf2f7", color: "#2d3748" },
   optCorrect: { background: "#c6f6d5", color: "#276749" },
   optWrong: { background: "#fed7d7", color: "#742a2a" },
+  optMultiple: { background: "#feebc8", color: "#744210" },
   optionNone: { color: "#a0aec0", fontSize: 13 },
   tickCorrect: { color: "#276749", fontWeight: 700, fontSize: 16 },
   tickWrong: { color: "#742a2a", fontWeight: 700, fontSize: 16 },
