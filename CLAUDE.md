@@ -49,6 +49,7 @@ Run migrations: cd backend && .venv/bin/alembic upgrade head
 ```
 DATABASE_URL=postgresql+asyncpg://slmc:slmc@localhost:5432/slmc_omr
 JWT_SECRET_KEY=slmc-omr-secret-key-change-in-production
+JWT_EXPIRE_HOURS=8
 UPLOAD_DIR=/tmp/slmc_uploads
 FILL_THRESHOLD=0.50
 CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
@@ -90,19 +91,21 @@ slmc-exam-omr/
 │   │       ├── bubble_detect.py# Fill ratio computation, digit grid detection
 │   │       ├── pipeline.py     # Orchestrates all OMR stages
 │   │       └── grader.py       # Scores answers against answer key
-│   └── alembic/                # DB migrations
+│   └── alembic/                # DB migrations (0001–0007)
 └── frontend/
     └── src/
         ├── api/
         │   ├── client.ts       # Axios instance + auth interceptor
-        │   └── exams.ts        # All exam/question/sheet API calls
+        │   ├── exams.ts        # Exam/question/sheet API calls
+        │   ├── submissions.ts  # Submission upload, reprocess, download
+        │   └── results.ts      # Results list, detail, summary, export
         ├── auth/
-        │   ├── authConfig.ts   # API_BASE_URL export
-        │   ├── AuthContext.tsx # React context: user, token, login(), logout()
+        │   ├── authConfig.ts   # API_BASE_URL (window.__ENV__ → import.meta.env → fallback)
+        │   ├── AuthContext.tsx  # React context: user, token, login(), logout()
         │   └── AuthGuard.tsx   # Route protection
         ├── components/layout/
         │   ├── Navbar.tsx      # SLMC logo, navy/gold theme
-        │   └── Layout.tsx      # Page wrapper
+        │   └── ExamLayout.tsx  # Tabbed layout wrapper for exam pages
         └── pages/
             ├── LoginPage.tsx
             ├── DashboardPage.tsx
@@ -112,13 +115,15 @@ slmc-exam-omr/
             ├── SheetGeneratorPage.tsx
             ├── UploadPage.tsx
             ├── SubmissionsPage.tsx
-            └── ResultsPage.tsx
+            ├── ResultsPage.tsx
+            └── ResultDetailPage.tsx
 ```
 
 ## API Routes (all prefixed /api/v1)
 
 | Method | Path | Description |
 |--------|------|-------------|
+| POST | /auth/login | JSON `{username, password}` → `{access_token, token_type, user}` |
 | GET | /exams | List all exams |
 | POST | /exams | Create exam |
 | GET | /exams/{id} | Get exam detail |
@@ -128,11 +133,16 @@ slmc-exam-omr/
 | GET | /exams/{id}/answer-key | Get answer key |
 | POST | /exams/{id}/answer-key | Upsert answer key |
 | POST | /exams/{id}/sheets/generate?id_mode=qr\|bubble_grid\|both | Generate PDF |
-| POST | /exams/{id}/submissions/upload | Upload scanned sheet images |
+| POST | /exams/{id}/submissions | Upload + process single image |
+| POST | /exams/{id}/submissions/batch | Batch image upload |
 | GET | /exams/{id}/submissions | List submissions |
-| POST | /exams/{id}/submissions/{sub_id}/reprocess | Re-run OMR pipeline |
+| GET | /exams/{id}/submissions/{sid}/image | Download original scanned image |
+| POST | /exams/{id}/submissions/{sid}/reprocess | Re-run OMR pipeline |
 | GET | /exams/{id}/results | Get graded results |
-| GET /health | Health check |
+| GET | /exams/{id}/results/summary | Stats + score distribution |
+| GET | /exams/{id}/results/{index}/detail | Per-question breakdown for one candidate |
+| GET | /exams/{id}/results/export | CSV or XLSX download |
+| GET | /health | Health check |
 
 ## Sheet Generation — id_mode
 
@@ -183,6 +193,29 @@ Key constants:
 
 An exam always has **one question type** — never mixed.
 
+## Multiple-Answer Detection (Type 1)
+
+If a candidate fills more than one bubble for a Type 1 question:
+- `detect_type1_answers()` stores `"MULTIPLE"` for that question (not a guess)
+- `grade_type1()` scores it as 0 — `"MULTIPLE"` never matches A–E
+- `ResultDetailPage` renders it as an orange "Multiple" badge
+- This is intentional — do not revert to the old "pick highest fill ratio" behaviour
+
+## Submission Digit Grid Params
+
+`Submission` stores `digit_count` (int, default 8) and `digit_orientation` (str, default "vertical") set at upload time. The reprocess endpoint reads these stored values so bubble-grid sheets are always reprocessed with the original settings. **Do not add `digit_count`/`digit_orientation` as query params to the reprocess endpoint** — they come from the DB record.
+
+## Role-Based Access
+
+| Role | Permissions |
+|------|-------------|
+| `admin` | Full access including user management |
+| `creator` | Create/edit exams, generate sheets, upload submissions |
+| `marker` | Upload and reprocess submissions, view results |
+| `viewer` | Read-only access to submissions and results |
+
+Enforced via `require_roles()` dependency in each router. Frontend gates UI elements with `hasRole(user, ...)` from `AuthContext`.
+
 ## Auth — Local DB
 
 - `POST /api/v1/auth/login` — JSON `{username, password}` → `{access_token, token_type, user}`
@@ -193,6 +226,20 @@ An exam always has **one question type** — never mixed.
 - Axios interceptor in `api/client.ts` reads token from localStorage on each request
 - Default admin seeded on first startup: username=`admin`, password=`admin123` (change immediately)
 - Backend must be started from `backend/` directory so `.env` is found
+
+## Docker Deployment
+
+```bash
+docker compose up --build   # first run (builds images, runs migrations)
+docker compose up           # subsequent starts
+docker compose down         # stop (volumes persist)
+```
+
+- Frontend served by nginx on port 3000
+- Backend on port 8000
+- `VITE_API_BASE_URL` injected at container start via `frontend/env.sh` → `window.__ENV__`
+- `authConfig.ts` reads: `window.__ENV__` → `import.meta.env` → `"http://localhost:8000"` fallback
+- Override `JWT_SECRET_KEY` via a `.env` file in the project root
 
 ## UI Theme — SLMC Brand
 
