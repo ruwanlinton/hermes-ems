@@ -55,7 +55,7 @@ Contact your administrator if you need a different level of access.
 2. Enter your **username** and **password** on the login page.
 3. Click **Sign In**. After successful authentication you are taken to the Dashboard.
 
-![Login page](docs/screenshots/login.png)
+<img src="docs/screenshots/login.png" width="60%" alt="Login page" />
 
 > First-time setup: the default administrator account is `admin` / `admin123`. Change the password immediately after first login via Settings.
 
