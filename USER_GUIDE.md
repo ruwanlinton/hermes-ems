@@ -17,8 +17,9 @@ Sri Lanka Medical Council Optical Mark Recognition (OMR) Examination Management 
 9. [Viewing Submissions](#viewing-submissions)
 10. [Viewing Results](#viewing-results)
 11. [Settings](#settings)
-12. [OMR Answer Sheet Layout](#omr-answer-sheet-layout)
-13. [Filling in the OMR Sheet (Candidate Instructions)](#filling-in-the-omr-sheet-candidate-instructions)
+12. [User Management](#user-management)
+13. [OMR Answer Sheet Layout](#omr-answer-sheet-layout)
+14. [Filling in the OMR Sheet (Candidate Instructions)](#filling-in-the-omr-sheet-candidate-instructions)
 
 ---
 
@@ -244,6 +245,52 @@ These defaults are applied automatically when opening the Sheet Generator and Up
 | **Default pass mark (%)** | Pass mark percentage applied to newly created exams (0–100). Can be adjusted per exam by creators and markers. |
 
 Click **Save Settings** to apply. Settings are stored in your browser and persist between sessions on the same device.
+
+---
+
+## User Management
+
+> This section is available to **admin** users only. The Users link is visible in the navigation bar only when logged in as an admin.
+
+User Management lets administrators create, edit, and delete user accounts and control their access roles.
+
+### Viewing Users
+
+Navigate to **Users** in the navigation bar to open the User Management page.
+
+![User Management page showing the list of users with their roles](docs/screenshots/user-management.png)
+
+The table shows each user's:
+- **Username / Name** — login username and display name
+- **Email** — email address (if provided)
+- **Roles** — colour-coded role badges (admin, creator, marker, viewer)
+- **Actions** — Edit and Delete buttons
+
+### Adding a User
+
+Click **+ Add User** (top right) to open the Add User dialog.
+
+<img src="docs/screenshots/add-user.png" width="55%" alt="Add User dialog with fields for username, password, display name, email, and roles" />
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| **Username** | Yes | Login name — must be unique (e.g. `jsmith`) |
+| **Password** | Yes | Initial password — share securely with the user |
+| **Display Name** | No | Full name shown in the navbar and user list |
+| **Email** | No | Email address for the user |
+| **Roles** | Yes | Select one or more roles — see [User Roles](#user-roles) for permissions |
+
+Click **Save** to create the account. The user can log in immediately with the provided credentials.
+
+### Editing a User
+
+Click **Edit** next to any user to update their display name, email, password, or roles. The username cannot be changed after creation.
+
+### Deleting a User
+
+Click **Delete** next to a user and confirm to permanently remove the account. This cannot be undone.
+
+> You cannot delete your own account. At least one admin account must remain in the system at all times.
 
 ---
 
