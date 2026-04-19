@@ -23,11 +23,11 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://slmc:slmc@postgres:5432/slmc_omr
-      ASGARDEO_BASE_URL: ${ASGARDEO_BASE_URL:-https://api.asgardeo.io/t/your-org}
-      JWT_AUDIENCE: ${JWT_AUDIENCE:-your-client-id}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+      JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-8}
       UPLOAD_DIR: /tmp/slmc_uploads
       FILL_THRESHOLD: "0.50"
-      CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,8 +39,6 @@ services:
     ports:
       - "3000:8080"
     environment:
-      VITE_ASGARDEO_CLIENT_ID: ${VITE_ASGARDEO_CLIENT_ID:-}
-      VITE_ASGARDEO_BASE_URL: ${VITE_ASGARDEO_BASE_URL:-}
       VITE_API_BASE_URL: http://localhost:8000
     depends_on:
       - backend
