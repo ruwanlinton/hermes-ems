@@ -78,7 +78,7 @@ The Dashboard provides a summary of all exams and quick navigation.
 
 Click **+ New Exam** from the Dashboard or Exams page. Exam creation is a three-step wizard.
 
-![Create Exam — Step 1: Metadata](docs/screenshots/exam-create.png)
+<img src="docs/screenshots/exam-create.png" width="60%" alt="Create Exam — Step 1: Metadata" />
 
 ### Step 1 — Metadata
 
