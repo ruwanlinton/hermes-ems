@@ -126,7 +126,7 @@ Before sheets can be graded, the correct answers must be entered.
 
 The system supports three sheet identification modes. Choose the mode that matches how your exam is set up.
 
-![Sheet Generator — Digit Bubble Grid mode selected](docs/screenshots/sheet-generator.png)
+<img src="docs/screenshots/sheet-generator.png" width="70%" alt="Sheet Generator — Digit Bubble Grid mode selected" />
 
 ### Sheet ID Modes
 
