@@ -16,8 +16,9 @@ Sri Lanka Medical Council Optical Mark Recognition (OMR) Examination Management 
 8. [Uploading Scanned Sheets](#uploading-scanned-sheets)
 9. [Viewing Submissions](#viewing-submissions)
 10. [Viewing Results](#viewing-results)
-11. [OMR Answer Sheet Layout](#omr-answer-sheet-layout)
-12. [Filling in the OMR Sheet (Candidate Instructions)](#filling-in-the-omr-sheet-candidate-instructions)
+11. [Settings](#settings)
+12. [OMR Answer Sheet Layout](#omr-answer-sheet-layout)
+13. [Filling in the OMR Sheet (Candidate Instructions)](#filling-in-the-omr-sheet-candidate-instructions)
 
 ---
 
@@ -222,6 +223,27 @@ After the examination, collect completed answer sheets and scan them.
    - **Correct** — the expected answer from the answer key
    - **Score** and **Result** (✓ / ✗) per question
 5. Click **Export CSV** or **Export XLSX** to download the full results table.
+
+---
+
+## Settings
+
+The Settings page lets you configure system-wide defaults that are pre-filled across the application. Access it from the **Settings** link in the navigation bar.
+
+<img src="docs/screenshots/settings.png" width="50%" alt="Settings page — OMR Sheet Defaults" />
+
+### OMR Sheet Defaults
+
+These defaults are applied automatically when opening the Sheet Generator and Upload pages, saving you from having to re-enter the same values for every exam.
+
+| Setting | Description |
+|---------|-------------|
+| **Default index digit columns** | Number of digit columns in the bubble grid index number field (1–10). Set this to match the digit count of your candidate index numbers. |
+| **Default identification method** | The ID mode pre-selected on the Sheet Generator page — QR Code, Digit Bubble Grid, or Both. |
+| **Default digit grid orientation** | Controls how the bubble grid is laid out on generated sheets and read during upload. **Horizontal** = digit positions down rows, values 0–9 across columns. Both sheet generation and upload must use the same orientation. |
+| **Default pass mark (%)** | Pass mark percentage applied to newly created exams (0–100). Can be adjusted per exam by creators and markers. |
+
+Click **Save Settings** to apply. Settings are stored in your browser and persist between sessions on the same device.
 
 ---
 
