@@ -7,40 +7,55 @@ Sri Lanka Medical Council Optical Mark Recognition (OMR) Examination Management 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Getting Started — Login](#getting-started--login)
-3. [Dashboard](#dashboard)
-4. [Creating an Exam](#creating-an-exam)
-5. [Managing Answer Keys](#managing-answer-keys)
-6. [Generating OMR Answer Sheets](#generating-omr-answer-sheets)
-7. [Uploading Scanned Sheets](#uploading-scanned-sheets)
-8. [Viewing Submissions](#viewing-submissions)
-9. [Viewing Results](#viewing-results)
-10. [OMR Answer Sheet Layout](#omr-answer-sheet-layout)
-11. [Filling in the OMR Sheet (Candidate Instructions)](#filling-in-the-omr-sheet-candidate-instructions)
+2. [User Roles](#user-roles)
+3. [Getting Started — Login](#getting-started--login)
+4. [Dashboard](#dashboard)
+5. [Creating an Exam](#creating-an-exam)
+6. [Managing Answer Keys](#managing-answer-keys)
+7. [Generating OMR Answer Sheets](#generating-omr-answer-sheets)
+8. [Uploading Scanned Sheets](#uploading-scanned-sheets)
+9. [Viewing Submissions](#viewing-submissions)
+10. [Viewing Results](#viewing-results)
+11. [OMR Answer Sheet Layout](#omr-answer-sheet-layout)
+12. [Filling in the OMR Sheet (Candidate Instructions)](#filling-in-the-omr-sheet-candidate-instructions)
 
 ---
 
 ## Overview
 
-The SLMC OMR System digitises the examination marking process for Sri Lanka Medical Council exams. Examiners create exams, generate personalised bubble-sheet answer sheets (one per candidate), scan the completed sheets after the exam, and obtain automated grading with per-candidate results and statistics.
+The SLMC OMR System digitises the examination marking process for Sri Lanka Medical Council exams. Examiners create exams, generate answer sheets, scan the completed sheets after the exam, and obtain automated grading with per-candidate results and statistics.
 
 **Two question types are supported:**
 
 | Type | Format | Marking |
 |------|--------|---------|
-| Type 1 — Single Best Answer | Candidate circles **one** option (A–E) per question | 1 mark for correct answer |
-| Type 2 — Extended True/False | Candidate marks **T or F** for each sub-option (A–E) per question | Marked per sub-option |
+| Type 1 — Single Best Answer | Candidate fills **one** bubble (A–E) per question | 1 mark for correct answer; 0 if wrong, blank, or multiple filled |
+| Type 2 — Extended True/False | Candidate marks **T or F** for each sub-option (A–E) per question | 0.2 marks per correct sub-option, max 1 mark per question |
+
+---
+
+## User Roles
+
+Each account is assigned one or more roles that control what actions are available.
+
+| Role | What they can do |
+|------|-----------------|
+| **Admin** | Full access — manage users, create and delete exams, upload, view results |
+| **Creator** | Create and edit exams, set answer keys, generate sheets, upload submissions |
+| **Marker** | Upload scanned sheets, reprocess submissions, view results |
+| **Viewer** | Read-only — view submissions and results only |
+
+Contact your administrator if you need a different level of access.
 
 ---
 
 ## Getting Started — Login
 
-1. Open the application URL in your browser (default: `http://localhost:5173`).
-2. You will be shown the SLMC login page.
-3. Click **Sign in with Asgardeo** to authenticate via the SLMC identity provider.
-4. After successful authentication you are redirected to the Dashboard.
+1. Open the application in your browser (default: `http://localhost:3000`).
+2. Enter your **username** and **password** on the login page.
+3. Click **Sign In**. After successful authentication you are taken to the Dashboard.
 
-> Only users who have been provisioned in the SLMC Asgardeo organisation can log in.
+> First-time setup: the default administrator account is `admin` / `admin123`. Change the password immediately after first login via Settings.
 
 ---
 
@@ -48,41 +63,27 @@ The SLMC OMR System digitises the examination marking process for Sri Lanka Medi
 
 The Dashboard provides a summary of all exams and quick navigation.
 
-- **Stat cards** at the top show counts by exam status: Draft, Active, Closed, Archived.
-- **Exam list** below shows all exams with their status, question type, and question count.
-- Click any exam card to open the Exam Detail page.
-- Click **Create New Exam** (top right) to start a new exam.
+- **Stat cards** at the top show counts by exam status: Draft, Active, Closed.
+- **Exam list** shows all exams with their status, question type, and question count.
+- Click any exam row to open the Exam Detail page.
+- Click **New Exam** (top right) to create a new exam.
 
 ---
 
 ## Creating an Exam
 
-Click **Create New Exam** from the Dashboard. Exam creation is a three-step wizard.
-
-### Step 1 — Basic Information
+Click **New Exam** from the Dashboard or Exams page.
 
 | Field | Description |
 |-------|-------------|
-| Exam Title | Full name of the examination (e.g., "SLMC Licensing Examination 2025 — Part I") |
+| Exam Title | Full name of the examination |
+| Exam Name | Short identifier used on printed sheets |
 | Exam Date | Date the examination will be held |
-| Description | Optional notes visible to administrators only |
+| Question Type | **Type 1** (Single Best Answer) or **Type 2** (Extended True/False) — one type per exam |
+| Number of Questions | Total question count |
+| Pass Mark | Minimum percentage required to pass (default 50%) |
 
-Click **Next** to proceed.
-
-### Step 2 — Questions
-
-| Field | Description |
-|-------|-------------|
-| Question Type | Select **Type 1 (Single Best Answer)** or **Type 2 (Extended True/False)** — an exam uses one type only |
-| Number of Questions | Total number of questions in the exam |
-
-Click **Next** to proceed.
-
-### Step 3 — Review & Submit
-
-Review all details. Click **Create Exam** to save. The exam is created in **Draft** status.
-
-After creation you are taken to the Exam Detail page.
+Click **Create Exam**. The exam is created in **Draft** status and you are taken to the Exam Detail page.
 
 ---
 
@@ -90,35 +91,42 @@ After creation you are taken to the Exam Detail page.
 
 Before sheets can be graded, the correct answers must be entered.
 
-1. Open the Exam Detail page.
-2. Click **Manage Answer Key**.
-3. For each question enter the correct answer:
+1. Open the Exam Detail page and click the **Answer Key** tab.
+2. For each question enter the correct answer:
    - **Type 1**: Select A, B, C, D, or E.
    - **Type 2**: For each sub-option (A–E) select T (True) or F (False).
-4. Click **Save Answer Key**.
+3. Click **Save Answer Key**.
 
-> The answer key can be updated at any time before grading. Re-uploading sheets after an answer key change will re-grade submissions automatically.
+> The answer key can be updated at any time. Reprocessing submissions after a change will re-grade them against the updated key.
 
 ---
 
 ## Generating OMR Answer Sheets
 
-Each candidate receives a personalised answer sheet with their index number encoded in a QR code.
+The system supports three sheet identification modes. Choose the mode that matches how your exam is set up.
 
-1. Open the Exam Detail page.
-2. Click **Generate Sheets**.
-3. Upload a CSV file containing candidate index numbers. The CSV must have one index number per row (no header required):
+### Sheet ID Modes
 
+| Mode | How index number is encoded | CSV required |
+|------|----------------------------|-------------|
+| **QR Code** | QR code printed at top of sheet — one personalised sheet per candidate | Yes |
+| **Bubble Grid** | Candidate fills in their index number using a digit bubble grid | No — single blank template |
+| **Both** | QR code (left) + bubble grid (right) — belt-and-braces approach | Yes |
+
+### Steps
+
+1. Open the Exam Detail page and click the **Generate Sheets** tab.
+2. Select the **ID Mode**.
+3. If using QR or Both mode, upload a CSV file with one index number per row (no header):
    ```
    2025/MED/001
    2025/MED/002
    2025/MED/003
    ```
+4. Set **Index Digit Columns** to match the length of your index numbers (used for the bubble grid; default 8).
+5. Click **Generate PDF**. Download and print the resulting PDF — one A4 page per candidate (or one blank template for Bubble Grid mode).
 
-4. Click **Generate PDF**. The system produces a multi-page PDF — one page per candidate.
-5. Download and print the PDF. Each page is A4.
-
-> Print at 100% scale (do not scale to fit). Use a printer that produces sharp, high-contrast output.
+> Print at exactly 100% scale. Do not scale to fit the page. Use a printer that produces sharp, high-contrast output.
 
 ---
 
@@ -126,48 +134,57 @@ Each candidate receives a personalised answer sheet with their index number enco
 
 After the examination, collect completed answer sheets and scan them.
 
-**Scanning requirements:**
+### Scanning Requirements
 
 - Resolution: **300 DPI minimum** (600 DPI recommended)
-- Colour: Greyscale or black-and-white
-- Format: PDF or image files (PNG, JPG)
-- Ensure all four alignment marks (corner squares) are visible and not cropped
+- Colour: Greyscale or colour (black-and-white is fine)
+- Format: JPG or PNG per sheet
+- All four corner alignment marks must be fully visible and not cropped
 
-**Upload steps:**
+### Upload Steps
 
-1. Open the Exam Detail page.
-2. Click **Upload Sheets**.
-3. Drag and drop scanned files onto the upload area, or click to browse.
-4. Multiple files can be uploaded in one batch.
-5. Click **Process**. The system will:
+1. Open the Exam Detail page and click the **Upload** tab.
+2. Set **Index digit columns** and **Grid orientation** to match what was used when generating the sheets.
+3. Drag and drop scanned files onto the upload area, or click to browse. Multiple files can be uploaded at once.
+4. Click **Process Files**. For each sheet the system will:
    - Detect alignment marks and correct perspective
-   - Read the QR code to identify the candidate and exam
+   - Read the QR code (or detect the digit bubble grid) to identify the candidate
    - Detect filled bubbles
    - Grade against the saved answer key
-6. Progress is shown per file. Completed sheets appear in the Submissions list.
+5. Each file shows a status badge (Done / Error) and the detected index number.
 
 ---
 
 ## Viewing Submissions
 
-1. Open the Exam Detail page.
-2. Click **Submissions** (or scroll to the submissions section).
-3. Each row shows: index number, score, total marks, percentage, and processing status.
-4. Submissions with status **Error** could not be processed (QR unreadable, sheet damaged, etc.). Click the row for details.
-5. Use **Reprocess** on an individual submission to re-run detection (useful after correcting an answer key or adjusting the fill threshold).
+1. Open the Exam Detail page and click the **Submissions** tab.
+2. The summary row at the top shows totals for Completed and Errors.
+3. Each row in the table shows:
+   - **Index #** — detected candidate index number
+   - **Status** — `completed`, `error`, or `pending`
+   - **Error Stage / Error** — details if processing failed
+   - **Created** — when the sheet was uploaded
+4. **Actions** available per row (depending on your role):
+   - **Download** — retrieves the original scanned image for inspection
+   - **Reprocess** — re-runs the full OMR pipeline on the saved image using the original digit-grid settings. Use this after correcting an answer key, or if a sheet initially failed.
+
+> Submissions with status **Error** could not be processed (QR unreadable, sheet damaged, no bubbles detected, etc.). Check the error message, verify the sheet is not damaged, and use Reprocess once the issue is resolved.
 
 ---
 
 ## Viewing Results
 
-1. Open the Exam Detail page.
-2. Click **Results**.
-3. The results page shows:
-   - Score distribution chart
-   - Pass/fail breakdown
-   - Per-candidate table (index number, score, percentage, pass/fail)
-4. Use the **Pass Mark** slider to adjust the passing threshold and see the breakdown update in real time.
-5. Click **Export CSV** to download the full results table for reporting.
+1. Open the Exam Detail page and click the **Results** tab.
+2. The results page shows:
+   - **Summary cards** — total candidates, mean score, highest, lowest, pass rate
+   - **Pass Mark slider** — adjust the passing threshold; the breakdown updates in real time
+   - **Score distribution chart** — bar chart showing candidates per 10% band
+   - **All Results table** — index number, score, percentage, pass/fail for every candidate
+3. Click an index number in the table to open the **per-candidate question breakdown**, which shows:
+   - Each question with the marked answer and the correct answer
+   - **Multiple** (orange) — candidate filled more than one bubble for a Type 1 question; scored as wrong
+   - Score per question and overall result
+4. Click **Export CSV** or **Export XLSX** to download the full results table.
 
 ---
 
@@ -175,21 +192,23 @@ After the examination, collect completed answer sheets and scan them.
 
 ### Header Area (top of page)
 
-- SLMC logo and exam title
-- Candidate index number and exam date
-- QR code (top-left corner) — do not cover, fold, or damage
+- SLMC logo and exam title / short name
+- Candidate index number (if QR mode) and exam date
+- **QR code** (top area) — do not cover, fold, or damage
+- **Digit bubble grid** (top-right) — present in Bubble Grid and Both modes
 
 ### Alignment Marks
 
-Four solid black squares in the corners of the page. These are used by the scanning software to correct sheet orientation and perspective. Do not mark over them.
+Four solid black squares in the corners of the page. The system uses these to automatically correct sheet orientation and perspective. Do not mark over them.
 
 ### Section A — Type 1 Questions (Single Best Answer)
 
 Questions are arranged in **three columns** across the page.
 
 - Column headers show **A B C D E** above each column.
-- Each row shows the question number (zero-padded, e.g. 01, 02 … 60) followed by five bubbles.
+- Each row shows the question number followed by five bubbles.
 - Candidate fills **one** bubble per row.
+- Filling more than one bubble for the same question is recorded as **Multiple** and scored as **wrong**.
 
 ### Section B — Type 2 Questions (Extended True/False)
 
@@ -211,11 +230,12 @@ Instructions for candidates are printed at the bottom of the sheet.
 
 1. **Use a black or dark blue ballpoint pen.** Do not use pencil or felt-tip markers.
 2. **Fill bubbles completely and darkly.** The entire circle must be filled — partially filled bubbles may not be detected.
-3. **One bubble per question (Section A).** If you change your answer, cross out the old bubble completely and fill the new one.
-4. **Two bubbles per sub-option (Section B)** — one in the T row and one in the F row for each letter A–E.
-5. **Do not make stray marks** anywhere on the sheet, especially near the bubbles, QR code, or corner alignment marks.
-6. **Do not fold, crease, or damage the sheet.** Damaged sheets may not be processable.
-7. Write your index number in the header area only if requested by the invigilator — it is already encoded in the QR code.
+3. **One bubble per question (Section A / Type 1).** Filling more than one bubble for the same question will be marked as wrong — there is no way to recover a multiple-filled answer.
+4. **If you change your answer (Type 1)**, cross out the incorrect bubble completely with a solid dark fill so it is indistinguishable from the correct one in darkness — or use correction fluid. Do not leave two visible bubbles.
+5. **Two bubbles per sub-option (Section B / Type 2)** — one in the T row and one in the F row for each letter A–E.
+6. **If using a Bubble Grid sheet**, fill in each digit of your index number carefully in the grid at the top-right. Every digit column must have exactly one bubble filled.
+7. **Do not make stray marks** anywhere on the sheet, especially near the bubbles, QR code, digit grid, or corner alignment marks.
+8. **Do not fold, crease, or damage the sheet.** Damaged sheets may not be processable.
 
 ---
 
