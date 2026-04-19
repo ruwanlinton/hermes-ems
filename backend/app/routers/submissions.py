@@ -1,7 +1,7 @@
 import os
 import uuid
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,6 +11,7 @@ from app.db.models import Exam, Submission, User
 from app.auth.jwt import require_roles
 from app.config import get_settings
 from app.omr.pipeline import process_submission
+from app.omr.ingest import is_pdf, pdf_to_images, IngestError
 from app.schemas.submission import SubmissionOut
 
 router = APIRouter()
@@ -38,27 +39,16 @@ async def _save_image(image_bytes: bytes, exam_id: str) -> str:
     return path
 
 
-@router.post("/exams/{exam_id}/submissions", response_model=SubmissionOut, status_code=201)
-async def upload_submission(
+async def _process_image_bytes(
+    image_bytes: bytes,
+    filename: str,
     exam_id: str,
-    file: UploadFile = File(...),
-    digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in the bubble grid (for bubble_grid id sheets)"),
-    digit_orientation: str = Query("vertical", description="Digit grid orientation: 'vertical' or 'horizontal'"),
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles("admin", "creator", "marker")),
-):
-    """Upload a single OMR sheet image and process it."""
-    await _get_exam_or_404(exam_id, db)
-
-    image_bytes = await file.read()
-    if len(image_bytes) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large. Max {settings.MAX_UPLOAD_SIZE_MB}MB.",
-        )
-
+    digit_count: int,
+    digit_orientation: str,
+    db: AsyncSession,
+) -> dict:
+    """Save, create submission record, and run the OMR pipeline for one image."""
     image_path = await _save_image(image_bytes, exam_id)
-
     submission = Submission(
         exam_id=exam_id,
         image_path=image_path,
@@ -70,8 +60,68 @@ async def upload_submission(
     await db.commit()
     await db.refresh(submission)
 
-    # Process synchronously for single upload
-    submission = await process_submission(image_bytes, exam_id, submission, db, digit_count=digit_count, digit_orientation=digit_orientation)
+    submission = await process_submission(
+        image_bytes, exam_id, submission, db,
+        digit_count=digit_count,
+        digit_orientation=digit_orientation,
+    )
+    return {
+        "filename": filename,
+        "submission_id": submission.id,
+        "status": submission.status,
+        "index_number": submission.index_number,
+        "error_stage": submission.error_stage,
+        "error_message": submission.error_message,
+    }
+
+
+@router.post("/exams/{exam_id}/submissions", response_model=SubmissionOut, status_code=201)
+async def upload_submission(
+    exam_id: str,
+    file: UploadFile = File(...),
+    digit_count: int = Query(8, ge=1, le=10),
+    digit_orientation: str = Query("vertical"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_roles("admin", "creator", "marker")),
+):
+    """Upload a single OMR sheet image or single-page PDF and process it."""
+    await _get_exam_or_404(exam_id, db)
+
+    file_bytes = await file.read()
+    if len(file_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"File too large. Max {settings.MAX_UPLOAD_SIZE_MB}MB.")
+
+    if is_pdf(file_bytes):
+        try:
+            pages = pdf_to_images(file_bytes)
+        except IngestError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        if len(pages) > 1:
+            raise HTTPException(
+                status_code=422,
+                detail=f"PDF has {len(pages)} pages. Use the batch upload endpoint for multi-page PDFs.",
+            )
+        image_bytes = pages[0]
+    else:
+        image_bytes = file_bytes
+
+    image_path = await _save_image(image_bytes, exam_id)
+    submission = Submission(
+        exam_id=exam_id,
+        image_path=image_path,
+        status="processing",
+        digit_count=digit_count,
+        digit_orientation=digit_orientation,
+    )
+    db.add(submission)
+    await db.commit()
+    await db.refresh(submission)
+
+    submission = await process_submission(
+        image_bytes, exam_id, submission, db,
+        digit_count=digit_count,
+        digit_orientation=digit_orientation,
+    )
     return submission
 
 
@@ -79,47 +129,49 @@ async def upload_submission(
 async def batch_upload_submissions(
     exam_id: str,
     files: List[UploadFile] = File(...),
-    digit_count: int = Query(8, ge=1, le=10, description="Number of digit columns in the bubble grid (for bubble_grid id sheets)"),
-    digit_orientation: str = Query("vertical", description="Digit grid orientation: 'vertical' or 'horizontal'"),
+    digit_count: int = Query(8, ge=1, le=10),
+    digit_orientation: str = Query("vertical"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_roles("admin", "creator", "marker")),
 ):
-    """Upload multiple OMR sheet images and process them sequentially."""
+    """Upload multiple OMR sheet images or PDFs and process them sequentially.
+    PDF files are automatically split into one submission per page."""
     await _get_exam_or_404(exam_id, db)
 
     results = []
     for file in files:
-        image_bytes = await file.read()
+        file_bytes = await file.read()
 
-        if len(image_bytes) > MAX_UPLOAD_BYTES:
+        if len(file_bytes) > MAX_UPLOAD_BYTES:
             results.append({
                 "filename": file.filename,
                 "status": "error",
-                "error": f"File too large (>{settings.MAX_UPLOAD_SIZE_MB}MB)",
+                "error_message": f"File too large (>{settings.MAX_UPLOAD_SIZE_MB}MB)",
             })
             continue
 
-        image_path = await _save_image(image_bytes, exam_id)
-        submission = Submission(
-            exam_id=exam_id,
-            image_path=image_path,
-            status="processing",
-            digit_count=digit_count,
-            digit_orientation=digit_orientation,
-        )
-        db.add(submission)
-        await db.commit()
-        await db.refresh(submission)
+        if is_pdf(file_bytes):
+            try:
+                pages = pdf_to_images(file_bytes)
+            except IngestError as e:
+                results.append({
+                    "filename": file.filename,
+                    "status": "error",
+                    "error_message": str(e),
+                })
+                continue
 
-        submission = await process_submission(image_bytes, exam_id, submission, db, digit_count=digit_count, digit_orientation=digit_orientation)
-        results.append({
-            "filename": file.filename,
-            "submission_id": submission.id,
-            "status": submission.status,
-            "index_number": submission.index_number,
-            "error_stage": submission.error_stage,
-            "error_message": submission.error_message,
-        })
+            for page_num, image_bytes in enumerate(pages, start=1):
+                page_label = f"{file.filename} (page {page_num})"
+                result = await _process_image_bytes(
+                    image_bytes, page_label, exam_id, digit_count, digit_orientation, db
+                )
+                results.append(result)
+        else:
+            result = await _process_image_bytes(
+                file_bytes, file.filename, exam_id, digit_count, digit_orientation, db
+            )
+            results.append(result)
 
     return {"results": results}
 

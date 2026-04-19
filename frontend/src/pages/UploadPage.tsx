@@ -31,8 +31,8 @@ export function UploadPage() {
 
     const pending = files.filter((f) => f.status === "pending");
 
-    if (pending.length === 1) {
-      // Single file upload
+    if (pending.length === 1 && pending[0].file.type !== "application/pdf") {
+      // Single image upload
       const item = pending[0];
       setFiles((prev) =>
         prev.map((f) => f.file === item.file ? { ...f, status: "uploading" } : f)

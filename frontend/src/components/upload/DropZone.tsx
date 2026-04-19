@@ -14,7 +14,10 @@ export function DropZone({ onFiles, multiple = true }: DropZoneProps) {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { "image/*": [".jpg", ".jpeg", ".png"] },
+    accept: {
+      "image/*": [".jpg", ".jpeg", ".png"],
+      "application/pdf": [".pdf"],
+    },
     multiple,
   });
 
@@ -33,7 +36,7 @@ export function DropZone({ onFiles, multiple = true }: DropZoneProps) {
         <p style={styles.text}>
           Drag & drop OMR sheet images here, or <strong>click to browse</strong>
           <br />
-          <span style={styles.hint}>JPEG or PNG • Max 20MB per file</span>
+          <span style={styles.hint}>JPEG, PNG, or PDF • Max 20MB per file</span>
         </p>
       )}
     </div>
