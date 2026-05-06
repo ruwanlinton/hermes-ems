@@ -30,89 +30,79 @@
 
 ## Windows Installation (Recommended)
 
-### Step 1 — Install Docker Desktop
+Windows installation uses the provided `install.bat` script which automates the entire setup process.
+
+### Prerequisites — install these first (one-time only)
+
+**1. Docker Desktop**
 
 1. Download **Docker Desktop for Windows** from:
    https://www.docker.com/products/docker-desktop/
-
-2. Run the installer. When prompted, keep **"Use WSL 2 instead of Hyper-V"** selected (recommended).
-
+2. Run the installer. When prompted, keep **"Use WSL 2 instead of Hyper-V"** selected.
 3. Restart your computer when asked.
+4. After restart, launch **Docker Desktop** from the Start menu and wait until the taskbar icon shows **"Engine running"**.
 
-4. After restart, launch **Docker Desktop** from the Start menu. Wait until the taskbar icon shows **"Engine running"** (this may take up to a minute on first launch).
+> If Docker Desktop prompts you to install a WSL 2 kernel update, follow the link and install it before continuing.
 
-> If Docker Desktop prompts you to install a WSL 2 kernel update, follow the link provided and install it before continuing.
+**2. Git for Windows**
 
-### Step 2 — Install Git
-
-1. Download **Git for Windows** from: https://git-scm.com/download/win
+1. Download from: https://git-scm.com/download/win
 2. Run the installer with default options.
 
-### Step 3 — Download the Application
+---
 
-Open **Command Prompt** or **PowerShell** and run:
+### Running the Installer
 
-```
-git clone https://github.com/ruwanlinton/slmc-exam-omr.git
-cd slmc-exam-omr
-```
+1. Download **`install.bat`** from:
+   https://github.com/ruwanlinton/slmc-exam-omr/raw/main/install.bat
 
-### Step 4 — Configure a Secret Key
+2. Make sure **Docker Desktop is running** (taskbar icon shows "Engine running").
 
-Create a file named `.env` inside the `slmc-exam-omr` folder with the following content:
+3. Double-click `install.bat`.
 
-```
-JWT_SECRET_KEY=replace-this-with-a-long-random-string
-```
+The script will automatically:
 
-Replace the value with any long random string (e.g. 40+ random characters). This protects user sessions. Keep this file private — do not share it.
+| Step | What happens |
+|------|-------------|
+| Check Git | Exits with a download link if Git is not found |
+| Check Docker | Exits with a download link if Docker is not found |
+| Check Docker Engine | Exits with instructions if Docker Desktop is not running |
+| Download application | Clones the repo to `%USERPROFILE%\slmc-omr` |
+| Configure secret key | Generates a random `JWT_SECRET_KEY` and saves it to `.env` |
+| Build and start | Runs `docker compose up --build` in the background |
+| Create shortcuts | Adds **SLMC OMR** shortcut to your Desktop, and creates `start.bat` and `stop.bat` |
+| Open browser | Opens `http://localhost:3000` automatically when ready |
 
-### Step 5 — Start the Application
+> The first run downloads and builds the application containers (~500 MB). This takes **5–10 minutes** depending on your internet speed. The window will show progress throughout.
 
-In the same Command Prompt or PowerShell window:
+4. When the installer finishes, the browser will open at **http://localhost:3000**.
 
-```
-docker compose up --build
-```
+5. Log in with the default administrator account:
+   - **Username:** `admin`
+   - **Password:** `admin123`
 
-The first run will:
-- Download the required base images (~500 MB)
-- Build the application containers
-- Set up the database automatically
+   **Change this password immediately** — see [First-Time Setup](#first-time-setup).
 
-This takes **5–10 minutes** on first run. Subsequent starts take under 30 seconds.
-
-When you see output like:
-```
-Application startup complete.
-```
-the system is ready.
-
-### Step 6 — Open the Application
-
-Open your browser and go to: **http://localhost:3000**
-
-Log in with the default administrator account:
-- **Username:** `admin`
-- **Password:** `admin123`
-
-**Change this password immediately** — see [First-Time Setup](#first-time-setup).
+---
 
 ### Starting and Stopping (Daily Use)
 
-**To start the application** (Docker Desktop must be running first):
-```
-cd slmc-exam-omr
-docker compose up
-```
+**To start the application:**
+- Double-click the **SLMC OMR** shortcut on your Desktop, **or**
+- Run `start.bat` in `%USERPROFILE%\slmc-omr`
+
+> Docker Desktop must be running before starting the application.
 
 **To stop the application:**
-Press `Ctrl + C` in the Command Prompt window, then run:
-```
-docker compose down
-```
+- Run `stop.bat` in `%USERPROFILE%\slmc-omr`
 
-Your data is saved between restarts.
+Your data is preserved between restarts.
+
+---
+
+### Updating the Application (Windows)
+
+Re-running `install.bat` will automatically pull the latest version of the application and rebuild the containers. Your data and `.env` configuration are preserved.
 
 ---
 
@@ -227,20 +217,18 @@ After logging in for the first time as `admin`:
 
 ## Updating the Application
 
-1. Stop the application if it is running:
-   ```
-   docker compose down
-   ```
+### Windows
 
-2. Pull the latest code:
-   ```
-   git pull origin main
-   ```
+Re-run `install.bat` — it detects the existing installation, pulls the latest code, rebuilds the containers, and restarts the application. Your data and `.env` are preserved.
 
-3. Rebuild and restart:
-   ```
-   docker compose up --build
-   ```
+### macOS / Linux
+
+```bash
+cd slmc-exam-omr
+docker compose down
+git pull origin main
+docker compose up --build
+```
 
 The database is preserved. Migrations are applied automatically on startup.
 
@@ -282,21 +270,33 @@ docker run --rm -v slmc-exam-omr_uploads:/data -v $(pwd):/backup \
 
 ## Uninstalling
 
-To remove the application and all its data:
+### Windows
+
+1. Open Command Prompt and run:
+   ```
+   cd %USERPROFILE%\slmc-omr
+   docker compose down -v
+   ```
+   > **Warning:** `-v` deletes all data volumes. All exam, submission, result, and user data will be permanently lost. Take a backup first if needed.
+
+2. Delete the application folder:
+   - Open File Explorer and delete `%USERPROFILE%\slmc-omr`
+
+3. Delete the Desktop shortcut:
+   - Right-click **SLMC OMR** on the Desktop → Delete
+
+4. To free Docker disk space:
+   ```
+   docker image prune -a
+   ```
+
+### macOS / Linux
 
 ```bash
-docker compose down -v   # stops containers and deletes volumes (ALL DATA WILL BE LOST)
-```
-
-To also remove the downloaded application files:
-```bash
+cd slmc-exam-omr
+docker compose down -v   # stops containers and deletes all data volumes
 cd ..
-rm -rf slmc-exam-omr     # macOS/Linux
-# Windows: delete the slmc-exam-omr folder in File Explorer
-```
-
-To remove the Docker images (frees disk space):
-```bash
+rm -rf slmc-exam-omr
 docker image prune -a
 ```
 
