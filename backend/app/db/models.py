@@ -5,7 +5,7 @@ from sqlalchemy import (
     String, Integer, Float, Text, DateTime, ForeignKey,
     UniqueConstraint, Enum as SAEnum, func, Boolean
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
@@ -22,7 +22,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String(255))
     name: Mapped[Optional[str]] = mapped_column(String(255))
-    roles: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    roles: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -78,7 +78,7 @@ class AnswerKey(Base):
         String(36), ForeignKey("questions.id"), unique=True, nullable=False
     )
     correct_option: Mapped[Optional[str]] = mapped_column(String(1))  # A-E for Type1
-    sub_options: Mapped[Optional[dict]] = mapped_column(JSONB)  # {A: true, B: false, ...} for Type2
+    sub_options: Mapped[Optional[dict]] = mapped_column(JSON)  # {A: true, B: false, ...} for Type2
 
     question: Mapped["Question"] = relationship(back_populates="answer_key")
 
@@ -95,7 +95,7 @@ class Submission(Base):
     )  # pending, processing, completed, error
     digit_count: Mapped[int] = mapped_column(Integer, default=8, nullable=False, server_default="8")
     digit_orientation: Mapped[str] = mapped_column(String(20), default="vertical", nullable=False, server_default="vertical")
-    raw_answers: Mapped[Optional[dict]] = mapped_column(JSONB)
+    raw_answers: Mapped[Optional[dict]] = mapped_column(JSON)
     error_stage: Mapped[Optional[str]] = mapped_column(String(50))
     error_message: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -114,7 +114,7 @@ class Result(Base):
     index_number: Mapped[str] = mapped_column(String(50), nullable=False)
     score: Mapped[float] = mapped_column(Float, default=0.0)
     percentage: Mapped[float] = mapped_column(Float, default=0.0)
-    question_scores: Mapped[Optional[dict]] = mapped_column(JSONB)
+    question_scores: Mapped[Optional[dict]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

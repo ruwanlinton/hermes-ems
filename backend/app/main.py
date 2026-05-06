@@ -2,20 +2,30 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 
 from app.config import get_settings
-from app.db.session import AsyncSessionLocal
-from app.db.models import User
+from app.db.session import AsyncSessionLocal, engine
+from app.db.models import User, Base
 from app.auth.jwt import hash_password
 from app.routers import exams, questions, answer_keys, sheets, submissions, results, users, admin_users, auth
 
 settings = get_settings()
 
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+
+    # For SQLite (standalone mode): create all tables automatically
+    if _is_sqlite:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
     # Seed default admin user if no users exist
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User).limit(1))
@@ -45,7 +55,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount routers
+# API routers — must be registered before the static file catch-all
 prefix = "/api/v1"
 app.include_router(auth.router, prefix=prefix, tags=["auth"])
 app.include_router(exams.router, prefix=prefix, tags=["exams"])
@@ -61,3 +71,15 @@ app.include_router(admin_users.router, prefix=prefix, tags=["admin"])
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+# Serve built frontend static files (standalone mode).
+# Must be mounted AFTER all API routes so /api/v1/* is not caught by the SPA fallback.
+_static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+if os.path.isdir(_static_dir):
+    app.mount("/assets", StaticFiles(directory=os.path.join(_static_dir, "assets")), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        """Serve the SPA index.html for all non-API routes (client-side routing)."""
+        return FileResponse(os.path.join(_static_dir, "index.html"))

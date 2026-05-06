@@ -7,7 +7,6 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.config import get_settings
 from app.db.models import Submission, Result, Question, AnswerKey
@@ -162,23 +161,24 @@ async def process_submission(
     submission.error_stage = None
     submission.error_message = None
 
-    # Upsert result (unique on exam_id + index_number)
-    result_stmt = pg_insert(Result).values(
-        id=str(uuid.uuid4()),
-        exam_id=exam_id,
-        index_number=index_number,
-        score=total_score,
-        percentage=round(percentage, 2),
-        question_scores=question_scores,
-    ).on_conflict_do_update(
-        index_elements=["exam_id", "index_number"],
-        set_=dict(
+    # Upsert result (unique on exam_id + index_number) — dialect-agnostic
+    existing = await db.execute(
+        select(Result).where(Result.exam_id == exam_id, Result.index_number == index_number)
+    )
+    result_row = existing.scalar_one_or_none()
+    if result_row:
+        result_row.score = total_score
+        result_row.percentage = round(percentage, 2)
+        result_row.question_scores = question_scores
+    else:
+        db.add(Result(
+            id=str(uuid.uuid4()),
+            exam_id=exam_id,
+            index_number=index_number,
             score=total_score,
             percentage=round(percentage, 2),
             question_scores=question_scores,
-        ),
-    )
-    await db.execute(result_stmt)
+        ))
     await db.commit()
     await db.refresh(submission)
 
