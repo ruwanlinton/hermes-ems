@@ -188,6 +188,12 @@ if not exist "%~dp0data\pgdata\PG_VERSION" (
     echo [Setup] Initialising database for the first time, please wait...
     echo %PG_PASSWORD%> "%~dp0data\pwfile.tmp"
     pgsql\bin\initdb.exe -D "%~dp0data\pgdata" -U postgres --pwfile="%~dp0data\pwfile.tmp" --auth=md5 --encoding=UTF8 > "%~dp0data\setup.log" 2>&1
+    if %ERRORLEVEL% neq 0 (
+        echo ERROR: Database initialisation failed. See data\setup.log
+        del "%~dp0data\pwfile.tmp" 2>nul
+        pause
+        exit /b 1
+    )
     del "%~dp0data\pwfile.tmp"
     echo port = %PG_PORT% >> "%~dp0data\pgdata\postgresql.conf"
 )
@@ -198,7 +204,7 @@ pgsql\bin\pg_ctl.exe start -D "%~dp0data\pgdata" -l "%~dp0data\pg.log" -w -t 30 
 if %ERRORLEVEL% neq 0 (
     pgsql\bin\psql.exe -h localhost -p %PG_PORT% -U postgres -c "SELECT 1" > nul 2>&1
     if %ERRORLEVEL% neq 0 (
-        echo ERROR: Could not start PostgreSQL. See data\pg.log for details.
+        echo ERROR: Could not start PostgreSQL. See data\pg.log
         pause
         exit /b 1
     )
@@ -211,22 +217,37 @@ if %ERRORLEVEL% neq 0 (
     pgsql\bin\psql.exe -h localhost -p %PG_PORT% -U postgres -c "CREATE DATABASE slmc_omr ENCODING 'UTF8';" > nul 2>&1
 )
 
-:: Apply Alembic migrations (safe to run on every start — only applies pending changes)
+:: Apply Alembic migrations (safe to run on every start)
 echo [3/3] Applying database migrations...
 python\python.exe -m alembic -c alembic.ini upgrade head > "%~dp0data\migrations.log" 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo ERROR: Database migrations failed. See data\migrations.log
+    pause
+    exit /b 1
+)
 
-echo Starting SLMC OMR System...
-start /min "SLMC OMR Server" python\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port %APP_PORT%
+:: Start the application server — output logged to data\app.log for diagnostics
+echo Starting SLMC OMR...
+start /min "SLMC OMR Server" cmd /c "python\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port %APP_PORT% > data\app.log 2>&1"
 
-:: Wait for server to be ready (up to 30 seconds)
+:: Wait up to 120 seconds (2 s intervals x 60 tries)
+:: First run is slow: OpenCV, numpy and other packages must be imported for the first time.
 set /a TRIES=0
 :wait
-timeout /t 1 /nobreak > nul
+timeout /t 2 /nobreak > nul
 set /a TRIES+=1
 curl -s http://localhost:%APP_PORT%/health > nul 2>&1
 if %ERRORLEVEL% equ 0 goto ready
-if %TRIES% lss 30 goto wait
-echo WARNING: Server took too long to start. Opening browser anyway.
+if %TRIES% lss 60 goto wait
+
+echo.
+echo ERROR: Server did not start within 2 minutes.
+echo Check the application log for details:
+echo   %~dp0data\app.log
+echo.
+pause
+exit /b 1
+
 :ready
 start http://localhost:%APP_PORT%
 '@
