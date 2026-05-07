@@ -53,29 +53,29 @@ Name: "{app}\data"
 Name: "{app}\data\uploads"
 
 [Icons]
-; Start Menu shortcut
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\python\python.exe"
-; Desktop shortcut (if task selected)
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\python\python.exe"; Tasks: desktopicon
-; Stop shortcut in Start Menu
-Name: "{group}\Stop {#AppName}"; Filename: "{app}\stop.bat"; WorkingDir: "{app}"
-; Uninstaller in Start Menu
+; Start Menu shortcuts
+Name: "{group}\{#AppName}";          Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\pgsql\bin\postgres.exe"
+Name: "{group}\Stop {#AppName}";     Filename: "{app}\stop.bat";      WorkingDir: "{app}"
+Name: "{group}\Configure {#AppName}"; Filename: "{app}\configure.bat"; WorkingDir: "{app}"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
+; Desktop shortcut (if task selected)
+Name: "{autodesktop}\{#AppName}";    Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\pgsql\bin\postgres.exe"; Tasks: desktopicon
 
 [Registry]
-; Store a random JWT secret key in the registry on first install
-Root: HKCU; Subkey: "Software\SLMC-OMR"; ValueType: string; ValueName: "JwtSecret"; ValueData: "{#SetupSetting("AppId")}-{code:GetRandomSuffix}"; Flags: createvalueifdoesntexist
+; Generate a random JWT secret key and DB password on first install; never overwrite on upgrades
+Root: HKCU; Subkey: "Software\SLMC-OMR"; ValueType: string; ValueName: "JwtSecret";  ValueData: "{code:GetRandomSuffix|jwt}";  Flags: createvalueifdoesntexist
+Root: HKCU; Subkey: "Software\SLMC-OMR"; ValueType: string; ValueName: "PgPassword"; ValueData: "{code:GetRandomSuffix|pg}";   Flags: createvalueifdoesntexist
 
 [Run]
 ; Launch the application after install
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent shellexec
 
 [UninstallRun]
-; Stop the server before uninstalling
+; Stop the server and database before uninstalling
 Filename: "{app}\stop.bat"; Flags: shellexec waituntilterminated
 
 [Code]
-// Generate a random suffix for the JWT secret key
+// Generate a random 32-character alphanumeric suffix (Param is ignored; present for ValueData macro)
 function GetRandomSuffix(Param: string): string;
 var
   i: Integer;
@@ -89,31 +89,37 @@ begin
   Result := result_str;
 end;
 
-// Write the JWT secret from registry into launch.bat before launch
+// Inject JWT secret and DB password into config.bat after installation
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  secret: string;
-  launchFile: string;
+  jwtSecret: string;
+  pgPassword: string;
+  configFile: string;
   content: TStringList;
   i: Integer;
   line: string;
 begin
   if CurStep = ssPostInstall then
   begin
-    if not RegQueryStringValue(HKCU, 'Software\SLMC-OMR', 'JwtSecret', secret) then
-      secret := 'default-change-me-' + GetRandomSuffix('');
+    // Read secrets from registry (written above); fall back to fresh random value
+    if not RegQueryStringValue(HKCU, 'Software\SLMC-OMR', 'JwtSecret', jwtSecret) then
+      jwtSecret := GetRandomSuffix('');
+    if not RegQueryStringValue(HKCU, 'Software\SLMC-OMR', 'PgPassword', pgPassword) then
+      pgPassword := GetRandomSuffix('');
 
-    launchFile := ExpandConstant('{app}\launch.bat');
+    configFile := ExpandConstant('{app}\config.bat');
     content := TStringList.Create;
     try
-      content.LoadFromFile(launchFile);
+      content.LoadFromFile(configFile);
       for i := 0 to content.Count - 1 do
       begin
         line := content[i];
+        if Pos('set PG_PASSWORD=', line) > 0 then
+          content[i] := 'set PG_PASSWORD=' + pgPassword;
         if Pos('set JWT_SECRET_KEY=', line) > 0 then
-          content[i] := 'set JWT_SECRET_KEY=' + secret;
+          content[i] := 'set JWT_SECRET_KEY=' + jwtSecret;
       end;
-      content.SaveToFile(launchFile);
+      content.SaveToFile(configFile);
     finally
       content.Free;
     end;

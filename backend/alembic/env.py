@@ -1,4 +1,5 @@
 import asyncio
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -17,11 +18,13 @@ from app.db.models import User, Exam, Question, AnswerKey, Submission, Result
 
 target_metadata = Base.metadata
 
+# DATABASE_URL env var takes precedence over alembic.ini (used in standalone Windows build)
+_db_url = os.environ.get("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
+        url=_db_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -38,7 +41,7 @@ def do_run_migrations(connection):
 
 async def run_async_migrations() -> None:
     configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = config.get_main_option("sqlalchemy.url")
+    configuration["sqlalchemy.url"] = _db_url
     connectable = async_engine_from_config(
         configuration,
         prefix="sqlalchemy.",
