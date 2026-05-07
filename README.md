@@ -10,7 +10,7 @@ Sri Lanka Medical Council — MCQ Licensing Exam OMR Management System.
 - **Multiple-answer detection** — If a candidate fills more than one bubble for a Type 1 question, it is recorded as "Multiple" and scored as wrong
 - **Results** — Score aggregation, pass/fail tracking, per-candidate question breakdown, CSV/XLSX export, score distribution chart
 - **Auth** — DB-backed local auth with bcrypt passwords and HS256 JWT tokens; role-based access control (admin, creator, marker, viewer)
-- **Deployment** — Docker Compose — runs on any machine with Docker Desktop (Windows, macOS, Linux)
+- **Deployment** — Windows standalone `.exe` installer (no Docker, no Git) or Docker Compose on any platform
 
 ---
 
@@ -25,7 +25,44 @@ slmc-exam-omr/
 
 ---
 
-## Quick Start — Docker (recommended)
+## Quick Start — Windows Standalone Installer
+
+No Docker, no Git, no prerequisites. Download and run the installer.
+
+### 1. Build the distribution (developer step)
+
+> Requires: Node.js 20+ in PATH, and a Windows machine (or run the script on Windows).
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build-windows.ps1
+```
+
+This downloads Python 3.11 embeddable, PostgreSQL 15 binaries, builds the React frontend, installs all Python packages, and writes the launcher scripts into `dist-windows\app\`.
+
+### 2. Compile the installer
+
+1. Install [Inno Setup](https://jrsoftware.org/isinfo.php) (free)
+2. Open `installer\setup.iss` in Inno Setup
+3. Click **Build → Compile**
+4. The installer is written to `installer\Output\SLMC-OMR-Setup.exe`
+
+### 3. Distribute
+
+Copy `SLMC-OMR-Setup.exe` to the target Windows machine and double-click to install. The installer:
+- Installs to `%LOCALAPPDATA%\SLMC-OMR` (no admin rights required)
+- Generates unique JWT and database password secrets
+- Creates Desktop and Start Menu shortcuts
+
+**To launch:** double-click the **SLMC OMR** desktop shortcut.
+The app opens at `http://localhost:8000` automatically.
+
+Default login: **username** `admin` / **password** `admin123` — change this immediately.
+
+See [INSTALLATION.md](INSTALLATION.md) for full installation and configuration details.
+
+---
+
+## Quick Start — Docker (cross-platform)
 
 ### Prerequisites
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows, macOS, or Linux)
