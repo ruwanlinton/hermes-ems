@@ -6,12 +6,12 @@ import { loadSettings } from "../settings";
 
 const ID_MODES = [
   {
-    value: "qr",
+    value: "qr" as const,
     label: "QR Code",
     desc: "Each sheet has a printed QR code identifying the candidate. One sheet per row in the CSV. Recommended for standard use.",
   },
   {
-    value: "bubble_grid",
+    value: "bubble_grid" as const,
     label: "Digit Bubble Grid",
     desc: "A single blank template is generated. Candidates fill in their numeric index number (up to 10 digits) by bubbling each digit. No CSV required.",
   },
