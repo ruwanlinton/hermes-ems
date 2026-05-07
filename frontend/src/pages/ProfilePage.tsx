@@ -9,12 +9,46 @@ export function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwSaved, setPwSaved] = useState(false);
+  const [pwError, setPwError] = useState("");
+
   useEffect(() => {
     usersApi.getProfile().then((r) => {
       setProfile(r.data);
       setName(r.data.name ?? "");
     });
   }, []);
+
+  const handleChangePassword = async () => {
+    setPwError("");
+    setPwSaved(false);
+    if (newPassword !== confirmPassword) {
+      setPwError("New passwords do not match.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPwError("New password must be at least 8 characters.");
+      return;
+    }
+    setPwSaving(true);
+    try {
+      await usersApi.changePassword({ current_password: currentPassword, new_password: newPassword });
+      setPwSaved(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPwSaved(false), 3000);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setPwError(detail ?? "Failed to change password.");
+    } finally {
+      setPwSaving(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -76,6 +110,56 @@ export function ProfilePage() {
                 {saving ? "Saving…" : "Save Changes"}
               </button>
             </div>
+
+            <div style={styles.divider} />
+            <p style={styles.sectionLabel}>Change Password</p>
+
+            <div style={styles.row}>
+              <label style={styles.label} htmlFor="cur-pw">Current Password</label>
+              <input
+                id="cur-pw"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                style={styles.input}
+                autoComplete="current-password"
+              />
+            </div>
+            <div style={styles.row}>
+              <label style={styles.label} htmlFor="new-pw">New Password</label>
+              <input
+                id="new-pw"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                style={styles.input}
+                autoComplete="new-password"
+                placeholder="Minimum 8 characters"
+              />
+            </div>
+            <div style={styles.row}>
+              <label style={styles.label} htmlFor="confirm-pw">Confirm New Password</label>
+              <input
+                id="confirm-pw"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                style={styles.input}
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div style={styles.actions}>
+              {pwError && <span style={styles.error}>{pwError}</span>}
+              {pwSaved && <span style={styles.success}>Password changed.</span>}
+              <button
+                onClick={handleChangePassword}
+                disabled={pwSaving || !currentPassword || !newPassword || !confirmPassword}
+                style={{ ...styles.btn, ...((pwSaving || !currentPassword || !newPassword || !confirmPassword) ? styles.btnDisabled : {}) }}
+              >
+                {pwSaving ? "Saving…" : "Change Password"}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -116,6 +200,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
   },
   divider: { borderTop: "1px solid #e2e8f0", margin: "8px 0 20px" },
+  sectionLabel: { fontSize: 13, fontWeight: 700, color: "#233654", marginBottom: 4, textTransform: "uppercase" as const, letterSpacing: "0.04em" },
   input: {
     flex: 1,
     padding: "8px 12px",
