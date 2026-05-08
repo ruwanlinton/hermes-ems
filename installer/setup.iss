@@ -73,7 +73,7 @@ Root: HKCU; Subkey: "Software\SLMC-OMR"; ValueType: string; ValueName: "PgPasswo
 [Run]
 ; Install Visual C++ 2015-2022 Redistributable if not already present.
 ; The installer detects an existing installation and exits quickly without changes.
-Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing Visual C++ Runtime..."; Flags: waitprogress
+Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing Visual C++ Runtime..."; Flags: waituntilterminated
 
 ; Launch the application after install
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent shellexec
