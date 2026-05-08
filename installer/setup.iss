@@ -44,6 +44,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &Desktop shortcut"; GroupDescription: "Additional icons:"
 
 [Files]
+; Visual C++ Redistributable — required by Python native extensions (numpy, OpenCV, asyncpg, …)
+; Extracted to a temp dir and deleted after the installer finishes.
+Source: "..\dist-windows\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+
 ; Application files from build-windows.ps1 output
 Source: "{#SrcDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
@@ -67,6 +71,11 @@ Root: HKCU; Subkey: "Software\SLMC-OMR"; ValueType: string; ValueName: "JwtSecre
 Root: HKCU; Subkey: "Software\SLMC-OMR"; ValueType: string; ValueName: "PgPassword"; ValueData: "{code:GetRandomSuffix|pg}";   Flags: createvalueifdoesntexist
 
 [Run]
+; Install Visual C++ 2015-2022 Redistributable if not already present.
+; The installer detects an existing installation and exits quickly without changes.
+Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; \
+  StatusMsg: "Installing Visual C++ Runtime..."; Flags: waitprogress
+
 ; Launch the application after install
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent shellexec
 

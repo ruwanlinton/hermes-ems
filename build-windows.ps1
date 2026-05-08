@@ -135,6 +135,17 @@ Write-Host "  Extracting PostgreSQL binaries..."
 Expand-Archive -Path $TMP_PG_ZIP -DestinationPath $APP_DIR -Force
 # Result: $APP_DIR\pgsql\bin\postgres.exe, initdb.exe, pg_ctl.exe, psql.exe ...
 
+# Download Visual C++ Redistributable for bundling in the installer.
+# Required by every compiled Python extension (numpy, OpenCV, asyncpg, bcrypt, etc.).
+# Cached in %TEMP% so rebuilds don't re-download.
+Write-Host "  Downloading Visual C++ Redistributable..."
+$VC_REDIST_URL   = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+$VC_REDIST_CACHE = "$env:TEMP\vc_redist.x64.exe"
+if (-not (Test-Path $VC_REDIST_CACHE)) {
+    Invoke-WebRequest -Uri $VC_REDIST_URL -OutFile $VC_REDIST_CACHE -UseBasicParsing
+}
+Copy-Item $VC_REDIST_CACHE "$DIST\vc_redist.x64.exe" -Force
+
 # ------------------------------------------------------------
 # 7. Write launcher and helper scripts
 # ------------------------------------------------------------
