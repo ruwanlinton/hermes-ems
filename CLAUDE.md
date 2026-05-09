@@ -63,7 +63,7 @@ VITE_API_BASE_URL=http://localhost:8000
 ## Project Structure
 
 ```
-slmc-exam-omr/
+hermes-ems/
 ├── backend/
 │   ├── .venv/                  # Python virtual environment
 │   ├── .env                    # Local env vars (not committed)
@@ -264,6 +264,6 @@ docker compose down         # stop (volumes persist)
 
 ## Git
 
-- Remote: https://github.com/ruwanlinton/slmc-exam-omr
+- Remote: https://github.com/ruwanlinton/hermes-ems
 - Branch: main
 - Commit and push after completing each feature or fix set

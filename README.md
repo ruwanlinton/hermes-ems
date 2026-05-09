@@ -17,7 +17,7 @@ Sri Lanka Medical Council — MCQ Licensing Exam OMR Management System.
 ## Architecture
 
 ```
-slmc-exam-omr/
+hermes-ems/
 ├── backend/          # Python 3.11, FastAPI, SQLAlchemy 2 (async), Alembic
 ├── frontend/         # React 18, TypeScript, Vite
 └── docker-compose.yml
@@ -70,8 +70,8 @@ See [INSTALLATION.md](INSTALLATION.md) for full installation and configuration d
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/ruwanlinton/slmc-exam-omr.git
-cd slmc-exam-omr
+git clone https://github.com/ruwanlinton/hermes-ems.git
+cd hermes-ems
 ```
 
 ### 2. Start everything

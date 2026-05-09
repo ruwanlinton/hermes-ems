@@ -119,7 +119,7 @@ Use this option if you prefer a containerised setup, are deploying on a server, 
 #### Running the installer
 
 1. Download **`install.bat`** from:
-   https://github.com/ruwanlinton/slmc-exam-omr/raw/main/install.bat
+   https://github.com/ruwanlinton/hermes-ems/raw/main/install.bat
 
 2. Make sure **Docker Desktop is running** (taskbar icon shows "Engine running").
 
@@ -169,8 +169,8 @@ The script automatically:
 ### Step 2 — Download the application
 
 ```bash
-git clone https://github.com/ruwanlinton/slmc-exam-omr.git
-cd slmc-exam-omr
+git clone https://github.com/ruwanlinton/hermes-ems.git
+cd hermes-ems
 ```
 
 ### Step 3 — Configure a secret key
@@ -213,8 +213,8 @@ sudo usermod -aG docker $USER
 ### Step 2 — Download the application
 
 ```bash
-git clone https://github.com/ruwanlinton/slmc-exam-omr.git
-cd slmc-exam-omr
+git clone https://github.com/ruwanlinton/hermes-ems.git
+cd hermes-ems
 ```
 
 ### Step 3 — Configure a secret key
@@ -317,7 +317,7 @@ Re-run `install.bat`. It detects the existing installation, pulls the latest cod
 ### Docker — macOS / Linux
 
 ```bash
-cd slmc-exam-omr
+cd hermes-ems
 docker compose down
 git pull origin main
 docker compose up --build
@@ -363,8 +363,8 @@ All data is stored in Docker volumes.
 
 | Volume | Contents |
 |--------|----------|
-| `slmc-exam-omr_postgres_data` | All exam, submission, result, and user data |
-| `slmc-exam-omr_uploads` | Original scanned sheet images |
+| `hermes-ems_postgres_data` | All exam, submission, result, and user data |
+| `hermes-ems_uploads` | Original scanned sheet images |
 
 **Back up the database:**
 
@@ -381,7 +381,7 @@ docker compose exec -T postgres psql -U slmc slmc_omr < backup_20250507.sql
 **Back up uploaded images:**
 
 ```bash
-docker run --rm -v slmc-exam-omr_uploads:/data -v $(pwd):/backup \
+docker run --rm -v hermes-ems_uploads:/data -v $(pwd):/backup \
   alpine tar czf /backup/uploads_$(date +%Y%m%d).tar.gz -C /data .
 ```
 
@@ -431,10 +431,10 @@ docker run --rm -v slmc-exam-omr_uploads:/data -v $(pwd):/backup \
 ### Docker — macOS / Linux
 
 ```bash
-cd slmc-exam-omr
+cd hermes-ems
 docker compose down -v   # stops containers and deletes all data volumes
 cd ..
-rm -rf slmc-exam-omr
+rm -rf hermes-ems
 docker image prune -a
 ```
 

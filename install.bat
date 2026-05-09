@@ -76,7 +76,7 @@ echo        Docker is running.
 echo [4/6] Setting up application files...
 
 set "INSTALL_DIR=%USERPROFILE%\slmc-omr"
-set "REPO_URL=https://github.com/ruwanlinton/slmc-exam-omr.git"
+set "REPO_URL=https://github.com/ruwanlinton/hermes-ems.git"
 
 if exist "%INSTALL_DIR%\.git" (
     echo        Existing installation found — pulling latest update...

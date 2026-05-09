@@ -10,7 +10,7 @@
 #define AppName      "SLMC OMR"
 #define AppVersion   "1.0"
 #define AppPublisher "Sri Lanka Medical Council"
-#define AppURL       "https://github.com/ruwanlinton/slmc-exam-omr"
+#define AppURL       "https://github.com/ruwanlinton/hermes-ems"
 #define AppExeName   "launch.bat"
 #define SrcDir       "..\dist-windows\app"
 
