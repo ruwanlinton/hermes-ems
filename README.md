@@ -1,6 +1,6 @@
-# SLMC OMR Web Application
+# Hermes Examination Management System (EMS)
 
-Sri Lanka Medical Council — MCQ Licensing Exam OMR Management System.
+Examination Management System including Optical Mark Recognition (OMR) based automated answer sheet generation, marking and analysis.
 
 ## Features
 
