@@ -47,6 +47,7 @@ export function Navbar() {
       <div style={styles.links}>
         <Link to="/" style={styles.link}>Dashboard</Link>
         <Link to="/exams" style={styles.link}>Exams</Link>
+        <Link to="/candidates" style={styles.link}>Candidates</Link>
         {hasRole(user, "admin") && <Link to="/admin/users" style={styles.link}>Users</Link>}
         <Link to="/settings" style={styles.link}>Settings</Link>
       </div>

@@ -1,9 +1,9 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 from sqlalchemy import (
-    String, Integer, Float, Text, DateTime, ForeignKey,
-    UniqueConstraint, Enum as SAEnum, func, Boolean
+    String, Integer, Float, Text, DateTime, Date, ForeignKey,
+    UniqueConstraint, Enum as SAEnum, func, Boolean, Index
 )
 from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -123,3 +123,22 @@ class Result(Base):
     exam: Mapped["Exam"] = relationship(back_populates="results")
 
     __table_args__ = (UniqueConstraint("exam_id", "index_number"),)
+
+
+class Candidate(Base):
+    __tablename__ = "candidates"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    registration_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    date_of_birth: Mapped[Optional[date]] = mapped_column(Date)
+    address: Mapped[Optional[str]] = mapped_column(Text)
+    mobile: Mapped[Optional[str]] = mapped_column(String(30))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_candidates_registration_number", "registration_number"),
+    )

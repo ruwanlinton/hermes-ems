@@ -14,6 +14,9 @@ import { ResultDetailPage } from "./pages/ResultDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { UserManagementPage } from "./pages/UserManagementPage";
+import { CandidatesPage } from "./pages/CandidatesPage";
+import { CandidateDetailPage } from "./pages/CandidateDetailPage";
+import { CandidateCreatePage } from "./pages/CandidateCreatePage";
 
 export function App() {
   return (
@@ -29,6 +32,9 @@ export function App() {
         <Route path="/exams/:id/submissions" element={<AuthGuard><SubmissionsPage /></AuthGuard>} />
         <Route path="/exams/:id/results" element={<AuthGuard><ResultsPage /></AuthGuard>} />
         <Route path="/exams/:id/results/:indexNumber" element={<AuthGuard><ResultDetailPage /></AuthGuard>} />
+        <Route path="/candidates" element={<AuthGuard><CandidatesPage /></AuthGuard>} />
+        <Route path="/candidates/new" element={<AuthGuard><CandidateCreatePage /></AuthGuard>} />
+        <Route path="/candidates/:id" element={<AuthGuard><CandidateDetailPage /></AuthGuard>} />
         <Route path="/settings" element={<AuthGuard><SettingsPage /></AuthGuard>} />
         <Route path="/profile" element={<AuthGuard><ProfilePage /></AuthGuard>} />
         <Route path="/admin/users" element={<AuthGuard><UserManagementPage /></AuthGuard>} />
