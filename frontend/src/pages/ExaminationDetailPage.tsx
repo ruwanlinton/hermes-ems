@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { Layout } from "../components/layout/Layout";
 import { examinationsApi, type ExaminationDetail, type SubjectWithPapers } from "../api/examinations";
 import { examsApi, type Exam } from "../api/exams";
+import { batchesApi, type Batch } from "../api/batches";
 import { useAuth, hasRole } from "../auth/AuthContext";
 
 type Status = "draft" | "active" | "closed";
@@ -14,8 +15,14 @@ export function ExaminationDetailPage() {
   const canEdit = hasRole(user, "admin", "creator");
 
   const [examination, setExamination] = useState<ExaminationDetail | null>(null);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Create batch
+  const [newBatchName, setNewBatchName] = useState("");
+  const [creatingBatch, setCreatingBatch] = useState(false);
+  const [batchError, setBatchError] = useState("");
 
   // Edit examination header
   const [editingHeader, setEditingHeader] = useState(false);
@@ -39,12 +46,16 @@ export function ExaminationDetailPage() {
   const load = async () => {
     if (!eid) return;
     try {
-      const res = await examinationsApi.get(eid);
-      setExamination(res.data);
+      const [examRes, batchRes] = await Promise.all([
+        examinationsApi.get(eid),
+        batchesApi.list(eid).catch(() => ({ data: [] as Batch[] })),
+      ]);
+      setExamination(examRes.data);
+      setBatches(batchRes.data);
       setHeaderForm({
-        title: res.data.title,
-        description: res.data.description ?? "",
-        exam_date: res.data.exam_date ? res.data.exam_date.slice(0, 10) : "",
+        title: examRes.data.title,
+        description: examRes.data.description ?? "",
+        exam_date: examRes.data.exam_date ? examRes.data.exam_date.slice(0, 10) : "",
       });
     } catch {
       setError("Examination not found.");
@@ -156,6 +167,22 @@ export function ExaminationDetailPage() {
       load();
     } catch (err: any) {
       alert(err?.response?.data?.detail || "Remove failed.");
+    }
+  };
+
+  const handleAddBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eid || !newBatchName.trim()) return;
+    setCreatingBatch(true);
+    setBatchError("");
+    try {
+      await batchesApi.create(eid, newBatchName.trim());
+      setNewBatchName("");
+      load();
+    } catch (err: any) {
+      setBatchError(err?.response?.data?.detail || "Failed to create batch.");
+    } finally {
+      setCreatingBatch(false);
     }
   };
 
@@ -305,6 +332,44 @@ export function ExaminationDetailPage() {
               {addingSubject ? "Adding…" : "+ Add Subject"}
             </button>
             {subjectError && <span style={{ color: "#c53030", fontSize: 12 }}>{subjectError}</span>}
+          </form>
+        )}
+      </div>
+
+      {/* Batches section */}
+      <div style={{ ...styles.section, marginTop: 24 }}>
+        <h2 style={styles.sectionTitle}>Candidate Batches</h2>
+        <p style={{ fontSize: 13, color: "#718096", marginBottom: 14 }}>
+          Batches group candidates for this sitting. Each candidate gets an index number per batch.
+        </p>
+
+        {batches.length === 0 ? (
+          <div style={styles.emptySubjects}>
+            {!isClosed ? "No batches yet. Create one below." : "No batches in this examination."}
+          </div>
+        ) : (
+          <div style={styles.batchGrid}>
+            {batches.map((b) => (
+              <Link key={b.id} to={`/examinations/${eid}/batches/${b.id}`} style={styles.batchCard}>
+                <div style={styles.batchName}>{b.name}</div>
+                <div style={styles.batchCount}>{b.member_count} candidate{b.member_count !== 1 ? "s" : ""}</div>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {canEdit && !isClosed && (
+          <form onSubmit={handleAddBatch} style={styles.addSubjectForm}>
+            <input
+              style={styles.addSubjectInput}
+              placeholder="New batch name (e.g. Colombo Centre)"
+              value={newBatchName}
+              onChange={(e) => setNewBatchName(e.target.value)}
+            />
+            <button type="submit" style={styles.addSubjectBtn} disabled={creatingBatch || !newBatchName.trim()}>
+              {creatingBatch ? "Creating…" : "+ Create Batch"}
+            </button>
+            {batchError && <span style={{ color: "#c53030", fontSize: 12 }}>{batchError}</span>}
           </form>
         )}
       </div>
@@ -530,6 +595,15 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "8px 18px", background: "#233654", color: "#fff",
     border: "none", borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: "pointer",
   },
+  batchGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16 },
+  batchCard: {
+    background: "#fff", borderRadius: 8, padding: "16px 18px",
+    border: "1px solid #e8e0d0", textDecoration: "none",
+    display: "flex", flexDirection: "column" as const, gap: 4,
+    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+  },
+  batchName: { fontSize: 15, fontWeight: 700, color: "#233654" },
+  batchCount: { fontSize: 12, color: "#718096" },
 };
 
 // SubjectBlock styles

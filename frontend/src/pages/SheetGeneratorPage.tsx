@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ExamLayout } from "../components/layout/ExamLayout";
 import { examsApi } from "../api/exams";
+import { batchesApi, type Batch } from "../api/batches";
 import { loadSettings } from "../settings";
 
 const ID_MODES = [
@@ -29,15 +30,36 @@ export function SheetGeneratorPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
 
+  // Batch support
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState("");
+  const [useBatch, setUseBatch] = useState(false);
+
   const needsCsv = idMode !== "bubble_grid";
+
+  // Load exam then batches for its examination
+  useEffect(() => {
+    if (!id) return;
+    examsApi.get(id).then((examRes) => {
+      const examinationId = examRes.data.examination_id;
+      if (examinationId) {
+        batchesApi.list(examinationId).then((batchRes) => {
+          setBatches(batchRes.data);
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+  }, [id]);
 
   const handleGenerate = async () => {
     if (!id) return;
-    if (needsCsv && !csvFile) return;
+    if (needsCsv && !useBatch && !csvFile) return;
+    if (needsCsv && useBatch && !selectedBatchId) return;
     setGenerating(true);
     setError("");
     try {
-      const res = await examsApi.generateSheets(id, idMode, csvFile ?? undefined, digitCount, digitOrientation, includeSubject, includeDate, includeRegNo);
+      const batchParam = needsCsv && useBatch ? selectedBatchId : undefined;
+      const csvParam = needsCsv && !useBatch ? (csvFile ?? undefined) : undefined;
+      const res = await examsApi.generateSheets(id, idMode, csvParam, digitCount, digitOrientation, includeSubject, includeDate, includeRegNo, batchParam);
       const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const a = document.createElement("a");
       a.href = url;
@@ -55,7 +77,10 @@ export function SheetGeneratorPage() {
     }
   };
 
-  const canGenerate = !generating && (needsCsv ? !!csvFile : true);
+  const canGenerate = !generating && (
+    !needsCsv ||
+    (useBatch ? !!selectedBatchId : !!csvFile)
+  );
 
   return (
     <ExamLayout>
@@ -90,32 +115,63 @@ export function SheetGeneratorPage() {
           </div>
         </div>
 
-        {/* CSV upload — only for qr / both modes */}
+        {/* CSV / Batch selection — only for qr / both modes */}
         {needsCsv && (
           <div style={styles.infoBox}>
-            <div style={styles.csvTemplate}>
-              <strong>CSV format (one index number per row):</strong>
-              <pre style={styles.pre}>{`index_number\n2024001\n2024002\n2024003`}</pre>
-              <a
-                href={`data:text/csv;charset=utf-8,index_number%0A2024001%0A2024002`}
-                download="index_numbers_template.csv"
-                style={styles.templateLink}
-              >
-                Download template
-              </a>
-            </div>
+            {/* Batch toggle (only shown when batches exist) */}
+            {batches.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+                  <label style={styles.toggleOption}>
+                    <input type="radio" checked={!useBatch} onChange={() => { setUseBatch(false); setSelectedBatchId(""); }} />
+                    <span style={{ marginLeft: 6 }}>Upload CSV file</span>
+                  </label>
+                  <label style={styles.toggleOption}>
+                    <input type="radio" checked={useBatch} onChange={() => { setUseBatch(true); setCsvFile(null); }} />
+                    <span style={{ marginLeft: 6 }}>Use a batch</span>
+                  </label>
+                </div>
+                {useBatch && (
+                  <select
+                    style={styles.batchSelect}
+                    value={selectedBatchId}
+                    onChange={(e) => setSelectedBatchId(e.target.value)}
+                  >
+                    <option value="">— select batch —</option>
+                    {batches.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name} ({b.member_count} candidates)</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
 
-            <label style={{ ...styles.digitLabel, marginTop: 10 }}>
-              CSV File
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
-                style={styles.fileInput}
-              />
-            </label>
-
-            {csvFile && <p style={styles.fileInfo}>{csvFile.name}</p>}
+            {/* CSV upload (shown when not using batch) */}
+            {!useBatch && (
+              <>
+                <div style={styles.csvTemplate}>
+                  <strong>CSV format (one index number per row):</strong>
+                  <pre style={styles.pre}>{`index_number\n2024001\n2024002\n2024003`}</pre>
+                  <a
+                    href={`data:text/csv;charset=utf-8,index_number%0A2024001%0A2024002`}
+                    download="index_numbers_template.csv"
+                    style={styles.templateLink}
+                  >
+                    Download template
+                  </a>
+                </div>
+                <label style={{ ...styles.digitLabel, marginTop: 10 }}>
+                  CSV File
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                    style={styles.fileInput}
+                  />
+                </label>
+                {csvFile && <p style={styles.fileInfo}>{csvFile.name}</p>}
+              </>
+            )}
           </div>
         )}
 
@@ -221,4 +277,6 @@ const styles: Record<string, React.CSSProperties> = {
   error: { background: "#fff5f5", border: "1px solid #fc8181", color: "#c53030", padding: "10px 14px", borderRadius: 6, fontSize: 13 },
   btn: { padding: "10px 24px", background: "#233654", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: "pointer", alignSelf: "flex-start" },
   btnDisabled: { background: "#a0aec0", cursor: "not-allowed" },
+  toggleOption: { display: "flex", alignItems: "center", cursor: "pointer", fontSize: 13 },
+  batchSelect: { padding: "5px 8px", border: "1px solid #d69e2e", borderRadius: 4, fontSize: 13, fontFamily: "inherit", width: "100%" },
 };

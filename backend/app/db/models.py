@@ -156,14 +156,60 @@ class Result(Base):
     score: Mapped[float] = mapped_column(Float, default=0.0)
     percentage: Mapped[float] = mapped_column(Float, default=0.0)
     question_scores: Mapped[Optional[dict]] = mapped_column(JSON)
+    candidate_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("candidates.id"), nullable=True
+    )
+    batch_membership_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("batch_memberships.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
 
     exam: Mapped["Exam"] = relationship(back_populates="results")
+    candidate: Mapped[Optional["Candidate"]] = relationship()
 
     __table_args__ = (UniqueConstraint("exam_id", "index_number"),)
+
+
+class Batch(Base):
+    __tablename__ = "batches"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    examination_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("examinations.id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    examination: Mapped["Examination"] = relationship()
+    memberships: Mapped[list["BatchMembership"]] = relationship(
+        back_populates="batch", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (UniqueConstraint("examination_id", "name"),)
+
+
+class BatchMembership(Base):
+    __tablename__ = "batch_memberships"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    batch_id: Mapped[str] = mapped_column(String(36), ForeignKey("batches.id"), nullable=False)
+    candidate_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("candidates.id"), nullable=False
+    )
+    index_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    batch: Mapped["Batch"] = relationship(back_populates="memberships")
+    candidate: Mapped["Candidate"] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint("batch_id", "candidate_id"),
+        UniqueConstraint("batch_id", "index_number"),
+        Index("ix_batch_memberships_batch_index", "batch_id", "index_number"),
+    )
 
 
 class Candidate(Base):

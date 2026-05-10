@@ -78,6 +78,7 @@ export const examsApi = {
     includeSubject: boolean = true,
     includeDate: boolean = true,
     includeRegNo: boolean = true,
+    batchId?: string,
   ) => {
     const params = new URLSearchParams({
       id_mode: idMode,
@@ -87,6 +88,7 @@ export const examsApi = {
       include_date: String(includeDate),
       include_reg_no: String(includeRegNo),
     });
+    if (batchId) params.set("batch_id", batchId);
     if (csvFile) {
       const form = new FormData();
       form.append("csv_file", csvFile);

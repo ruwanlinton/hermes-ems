@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.db.session import AsyncSessionLocal, engine
 from app.db.models import User, Base
 from app.auth.jwt import hash_password
-from app.routers import exams, questions, answer_keys, sheets, submissions, results, users, admin_users, auth, candidates, examinations
+from app.routers import exams, questions, answer_keys, sheets, submissions, results, users, admin_users, auth, candidates, examinations, batches
 
 settings = get_settings()
 
@@ -68,6 +68,7 @@ app.include_router(users.router, prefix=prefix, tags=["users"])
 app.include_router(admin_users.router, prefix=prefix, tags=["admin"])
 app.include_router(candidates.router, prefix=prefix, tags=["candidates"])
 app.include_router(examinations.router, prefix=prefix, tags=["examinations"])
+app.include_router(batches.router, prefix=prefix, tags=["batches"])
 
 
 @app.get("/health")

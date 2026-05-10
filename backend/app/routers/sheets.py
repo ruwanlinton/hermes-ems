@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.db.session import get_db
-from app.db.models import Exam, Question, User
+from app.db.models import Batch, BatchMembership, Exam, Question, User
 from app.auth.jwt import require_roles
 from app.pdf.generator import generate_batch_pdf
 
@@ -23,15 +23,16 @@ async def generate_sheets(
     include_subject: bool = Query(True, description="Include Subject field in header"),
     include_date: bool = Query(True, description="Include Date field in header"),
     include_reg_no: bool = Query(True, description="Include Reg. No field in header"),
+    batch_id: Optional[str] = Query(None, description="Use index numbers from this batch instead of CSV"),
     csv_file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_roles("admin", "creator", "marker", "viewer")),
 ):
     """Generate OMR answer sheets PDF.
 
-    id_mode='qr'          – personalised QR-coded sheets (CSV required)
-    id_mode='bubble_grid' – single blank template; candidate fills digit bubbles (CSV not required)
-    id_mode='both'        – personalised sheets with QR + digit grid (CSV required)
+    id_mode='qr'          – personalised QR-coded sheets (CSV or batch_id required)
+    id_mode='bubble_grid' – single blank template; candidate fills digit bubbles (no CSV/batch needed)
+    id_mode='both'        – personalised sheets with QR + digit grid (CSV or batch_id required)
     """
     if id_mode not in ("qr", "bubble_grid", "both"):
         raise HTTPException(status_code=400, detail="id_mode must be 'qr', 'bubble_grid', or 'both'")
@@ -41,12 +42,25 @@ async def generate_sheets(
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
 
-    # Parse CSV for index numbers (not needed for bubble_grid)
+    # Resolve index numbers
     if id_mode == "bubble_grid":
         index_numbers = [""]
+    elif batch_id:
+        # Validate batch belongs to this exam's examination
+        batch = (await db.execute(select(Batch).where(Batch.id == batch_id))).scalar_one_or_none()
+        if not batch:
+            raise HTTPException(status_code=404, detail="Batch not found")
+        memberships = (await db.execute(
+            select(BatchMembership)
+            .where(BatchMembership.batch_id == batch_id)
+            .order_by(BatchMembership.index_number)
+        )).scalars().all()
+        index_numbers = [m.index_number for m in memberships]
+        if not index_numbers:
+            raise HTTPException(status_code=400, detail="Batch has no members")
     else:
         if csv_file is None:
-            raise HTTPException(status_code=400, detail="CSV file is required for this id_mode")
+            raise HTTPException(status_code=400, detail="CSV file or batch_id is required for this id_mode")
         content = await csv_file.read()
         try:
             decoded = content.decode("utf-8-sig")

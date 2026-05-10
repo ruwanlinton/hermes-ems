@@ -10,7 +10,7 @@ from sqlalchemy import or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.db.models import Candidate, User
+from app.db.models import Candidate, BatchMembership, User
 from app.auth.jwt import require_roles
 from app.schemas.candidate import CandidateCreate, CandidateUpdate, CandidateOut, ImportResult, ImportError
 
@@ -144,8 +144,14 @@ async def delete_candidate(
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
 
-    # Block delete if enrolled in any batch (Phase 3 will add BatchMembership)
-    # Check is a no-op now; the FK constraint will enforce it once batches are added.
+    enrollment_count = (await db.execute(
+        select(func.count()).where(BatchMembership.candidate_id == candidate_id)
+    )).scalar_one()
+    if enrollment_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot delete: candidate is enrolled in {enrollment_count} batch(es). Unenroll first.",
+        )
 
     await db.delete(candidate)
     await db.commit()

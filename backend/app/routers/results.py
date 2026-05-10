@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
-from app.db.models import Exam, Result, Submission, Question, AnswerKey, User
+from app.db.models import Exam, Result, Submission, Question, AnswerKey, User, Batch, BatchMembership, Subject
 from app.auth.jwt import require_roles
 from app.schemas.submission import ResultOut, ResultSummary, ResultDetail, QuestionDetail
 from app.services.export_service import results_to_csv, results_to_xlsx
@@ -22,6 +23,16 @@ async def _get_exam_or_404(exam_id: str, db: AsyncSession) -> Exam:
     return exam
 
 
+def _result_out(r: Result) -> ResultOut:
+    out = ResultOut.model_validate(r)
+    if r.candidate:
+        out = out.model_copy(update={
+            "candidate_name": r.candidate.name,
+            "candidate_registration_number": r.candidate.registration_number,
+        })
+    return out
+
+
 @router.get("/exams/{exam_id}/results", response_model=List[ResultOut])
 async def list_results(
     exam_id: str,
@@ -31,10 +42,11 @@ async def list_results(
     await _get_exam_or_404(exam_id, db)
     result = await db.execute(
         select(Result)
+        .options(selectinload(Result.candidate))
         .where(Result.exam_id == exam_id)
         .order_by(Result.index_number)
     )
-    return result.scalars().all()
+    return [_result_out(r) for r in result.scalars().all()]
 
 
 @router.get("/exams/{exam_id}/results/{index_number}/detail", response_model=ResultDetail)
@@ -196,3 +208,66 @@ async def export_results(
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/exams/{exam_id}/results/link-candidates")
+async def link_candidates(
+    exam_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_roles("admin")),
+):
+    """Match existing unlinked results to candidates via batch membership index numbers.
+
+    For each Result with candidate_id = NULL, look up batch_memberships where:
+    - index_number matches the result's index_number
+    - the membership's batch belongs to the same examination as this paper's subject
+
+    Exactly one match → link. Zero or multiple → skip (reported back).
+    """
+    exam = await _get_exam_or_404(exam_id, db)
+
+    # Resolve examination_id via the exam's subject
+    examination_id: str | None = None
+    if exam.subject_id:
+        sub = (await db.execute(select(Subject).where(Subject.id == exam.subject_id))).scalar_one_or_none()
+        if sub:
+            examination_id = sub.examination_id
+
+    if not examination_id:
+        raise HTTPException(
+            status_code=422,
+            detail="This paper is not linked to an examination via a subject. Assign it to a subject first.",
+        )
+
+    # Fetch all unlinked results for this exam
+    unlinked = (await db.execute(
+        select(Result)
+        .where(Result.exam_id == exam_id, Result.candidate_id.is_(None))
+    )).scalars().all()
+
+    linked = 0
+    skipped = []
+
+    for result in unlinked:
+        # Find matching memberships in any batch under this examination
+        matches = (await db.execute(
+            select(BatchMembership)
+            .join(Batch, Batch.id == BatchMembership.batch_id)
+            .where(
+                Batch.examination_id == examination_id,
+                BatchMembership.index_number == result.index_number,
+            )
+        )).scalars().all()
+
+        if len(matches) == 1:
+            result.candidate_id = matches[0].candidate_id
+            result.batch_membership_id = matches[0].id
+            linked += 1
+        else:
+            skipped.append({
+                "index_number": result.index_number,
+                "reason": "no match" if len(matches) == 0 else f"{len(matches)} matches found",
+            })
+
+    await db.commit()
+    return {"linked": linked, "skipped": skipped}

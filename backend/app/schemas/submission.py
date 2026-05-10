@@ -25,6 +25,9 @@ class ResultOut(BaseModel):
     score: float
     percentage: float
     question_scores: Optional[dict]
+    candidate_id: Optional[str] = None
+    candidate_name: Optional[str] = None
+    candidate_registration_number: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
