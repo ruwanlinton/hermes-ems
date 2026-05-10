@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel
 
 
@@ -10,6 +10,7 @@ class ExamCreate(BaseModel):
     total_questions: int = 0
     status: str = "draft"
     pass_mark: float = 50.0
+    subject_id: Optional[str] = None
 
 
 class ExamUpdate(BaseModel):
@@ -19,6 +20,8 @@ class ExamUpdate(BaseModel):
     total_questions: Optional[int] = None
     status: Optional[str] = None
     pass_mark: Optional[float] = None
+    # subject_id uses Any so explicit `null` can clear the assignment
+    subject_id: Any = None
 
 
 class ExamOut(BaseModel):
@@ -30,6 +33,11 @@ class ExamOut(BaseModel):
     total_questions: int
     status: str
     pass_mark: float
+    subject_id: Optional[str] = None
+    # Populated only when fetched via GET /exams/{id} with eager-loaded subject
+    subject_name: Optional[str] = None
+    examination_id: Optional[str] = None
+    examination_title: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

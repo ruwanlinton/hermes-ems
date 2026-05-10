@@ -9,6 +9,11 @@ export interface Exam {
   total_questions: number;
   status: string;
   pass_mark: number;
+  subject_id: string | null;
+  // Populated only by GET /exams/{id}
+  subject_name: string | null;
+  examination_id: string | null;
+  examination_title: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -35,6 +40,7 @@ export interface ExamCreate {
   total_questions?: number;
   status?: string;
   pass_mark?: number;
+  subject_id?: string;
 }
 
 export interface QuestionCreate {

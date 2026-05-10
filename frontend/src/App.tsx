@@ -17,6 +17,9 @@ import { UserManagementPage } from "./pages/UserManagementPage";
 import { CandidatesPage } from "./pages/CandidatesPage";
 import { CandidateDetailPage } from "./pages/CandidateDetailPage";
 import { CandidateCreatePage } from "./pages/CandidateCreatePage";
+import { ExaminationsPage } from "./pages/ExaminationsPage";
+import { ExaminationCreatePage } from "./pages/ExaminationCreatePage";
+import { ExaminationDetailPage } from "./pages/ExaminationDetailPage";
 
 export function App() {
   return (
@@ -32,6 +35,9 @@ export function App() {
         <Route path="/exams/:id/submissions" element={<AuthGuard><SubmissionsPage /></AuthGuard>} />
         <Route path="/exams/:id/results" element={<AuthGuard><ResultsPage /></AuthGuard>} />
         <Route path="/exams/:id/results/:indexNumber" element={<AuthGuard><ResultDetailPage /></AuthGuard>} />
+        <Route path="/examinations" element={<AuthGuard><ExaminationsPage /></AuthGuard>} />
+        <Route path="/examinations/new" element={<AuthGuard><ExaminationCreatePage /></AuthGuard>} />
+        <Route path="/examinations/:eid" element={<AuthGuard><ExaminationDetailPage /></AuthGuard>} />
         <Route path="/candidates" element={<AuthGuard><CandidatesPage /></AuthGuard>} />
         <Route path="/candidates/new" element={<AuthGuard><CandidateCreatePage /></AuthGuard>} />
         <Route path="/candidates/:id" element={<AuthGuard><CandidateDetailPage /></AuthGuard>} />

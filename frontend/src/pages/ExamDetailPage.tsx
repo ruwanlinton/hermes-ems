@@ -77,6 +77,21 @@ export function ExamDetailPage() {
   if (loading) return <ExamLayout><p>Loading...</p></ExamLayout>;
   if (!exam) return <ExamLayout><p>Exam not found.</p></ExamLayout>;
 
+  const breadcrumb = exam.examination_id && exam.examination_title ? (
+    <div style={{ fontSize: 13, color: "#718096", marginBottom: 12 }}>
+      <Link to="/examinations" style={{ color: "#ba3c3c", textDecoration: "none", fontWeight: 500 }}>
+        Examinations
+      </Link>
+      {" / "}
+      <Link to={`/examinations/${exam.examination_id}`} style={{ color: "#ba3c3c", textDecoration: "none", fontWeight: 500 }}>
+        {exam.examination_title}
+      </Link>
+      {exam.subject_name && <>{" / "}<span>{exam.subject_name}</span></>}
+      {" / "}
+      <span>{exam.title}</span>
+    </div>
+  ) : null;
+
   const type1 = questions.filter((q) => q.question_type === "type1");
 
   const answerKeyComplete = questions.length > 0 && questions.every((q) => {
@@ -89,6 +104,7 @@ export function ExamDetailPage() {
 
   return (
     <ExamLayout>
+      {breadcrumb}
       <div style={styles.header}>
         {canEditAnswerKey && (editing ? (
           <div style={styles.editRow}>

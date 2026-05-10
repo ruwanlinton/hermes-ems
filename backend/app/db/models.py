@@ -26,6 +26,43 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class Examination(Base):
+    __tablename__ = "examinations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    exam_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    status: Mapped[str] = mapped_column(String(50), default="draft", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    subjects: Mapped[list["Subject"]] = relationship(
+        back_populates="examination",
+        cascade="all, delete-orphan",
+        order_by="Subject.display_order",
+    )
+
+
+class Subject(Base):
+    __tablename__ = "subjects"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    examination_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("examinations.id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    examination: Mapped["Examination"] = relationship(back_populates="subjects")
+    exams: Mapped[list["Exam"]] = relationship(back_populates="subject")
+
+    __table_args__ = (UniqueConstraint("examination_id", "name"),)
+
+
 class Exam(Base):
     __tablename__ = "exams"
 
@@ -37,11 +74,15 @@ class Exam(Base):
     total_questions: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(50), default="draft")  # draft, active, closed
     pass_mark: Mapped[float] = mapped_column(Float, default=50.0, nullable=False)
+    subject_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("subjects.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
 
+    subject: Mapped[Optional["Subject"]] = relationship(back_populates="exams")
     questions: Mapped[list["Question"]] = relationship(
         back_populates="exam", cascade="all, delete-orphan"
     )
