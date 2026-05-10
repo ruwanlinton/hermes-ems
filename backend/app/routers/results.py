@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.db.models import Exam, Result, Submission, Question, AnswerKey, User, Batch, BatchMembership, Subject
 from app.auth.jwt import require_roles
 from app.schemas.submission import ResultOut, ResultSummary, ResultDetail, QuestionDetail
+from app.schemas.stats import QuestionStat
 from app.services.export_service import results_to_csv, results_to_xlsx
 
 router = APIRouter()
@@ -208,6 +209,86 @@ async def export_results(
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/exams/{exam_id}/results/question-stats", response_model=list[QuestionStat])
+async def get_question_stats(
+    exam_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_roles("admin", "creator", "marker", "viewer")),
+):
+    """Per-question correct/wrong/multiple/unanswered breakdown across all graded submissions."""
+    await _get_exam_or_404(exam_id, db)
+
+    questions = (await db.execute(
+        select(Question)
+        .options(selectinload(Question.answer_key))
+        .where(Question.exam_id == exam_id)
+        .order_by(Question.question_number)
+    )).scalars().all()
+
+    if not questions:
+        return []
+
+    # Latest completed submission per index_number (Python de-dup after ordering)
+    subs = (await db.execute(
+        select(Submission)
+        .where(Submission.exam_id == exam_id, Submission.status == "completed")
+        .order_by(Submission.index_number, Submission.created_at.desc())
+    )).scalars().all()
+
+    raw_by_index: dict[str, dict] = {}
+    for sub in subs:
+        if sub.index_number and sub.index_number not in raw_by_index:
+            raw_by_index[sub.index_number] = sub.raw_answers or {}
+
+    total = len(raw_by_index)
+
+    stats = []
+    for q in questions:
+        q_num = str(q.question_number)
+        ak = q.answer_key
+        correct_count = wrong_count = multiple_count = unanswered_count = 0
+
+        for raw_answers in raw_by_index.values():
+            if q.question_type == "type1":
+                detected = raw_answers.get("type1", {}).get(q_num)
+                if detected is None:
+                    unanswered_count += 1
+                elif detected == "MULTIPLE":
+                    multiple_count += 1
+                elif ak and ak.correct_option and detected.upper() == ak.correct_option.upper():
+                    correct_count += 1
+                else:
+                    wrong_count += 1
+            else:  # type2
+                detected = raw_answers.get("type2", {}).get(q_num)
+                if not detected:
+                    unanswered_count += 1
+                elif ak and ak.sub_options:
+                    # Full credit = all sub-options match
+                    if all(
+                        detected.get(opt) == val
+                        for opt, val in ak.sub_options.items()
+                    ):
+                        correct_count += 1
+                    else:
+                        wrong_count += 1
+                else:
+                    wrong_count += 1
+
+        stats.append(QuestionStat(
+            question_number=q.question_number,
+            question_type=q.question_type,
+            total_responses=total,
+            correct=correct_count,
+            wrong=wrong_count,
+            multiple=multiple_count,
+            unanswered=unanswered_count,
+            correct_rate=round(correct_count / total, 4) if total > 0 else 0.0,
+        ))
+
+    return stats
 
 
 @router.post("/exams/{exam_id}/results/link-candidates")

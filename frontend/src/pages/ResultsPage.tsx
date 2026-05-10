@@ -3,12 +3,15 @@ import { useParams, Link } from "react-router-dom";
 import { ExamLayout } from "../components/layout/ExamLayout";
 import { examsApi } from "../api/exams";
 import { resultsApi, type Result, type ResultSummary } from "../api/results";
+import { statsApi, type QuestionStat } from "../api/stats";
 import { ScoreChart } from "../components/results/ScoreChart";
 
 export function ResultsPage() {
   const { id } = useParams<{ id: string }>();
+  const [tab, setTab] = useState<"results" | "questions">("results");
   const [results, setResults] = useState<Result[]>([]);
   const [summary, setSummary] = useState<ResultSummary | null>(null);
+  const [questionStats, setQuestionStats] = useState<QuestionStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [passMark, setPassMark] = useState<number | null>(null);
 
@@ -31,6 +34,12 @@ export function ResultsPage() {
     if (!loading && passMark !== null) resultsApi.summary(id!, passMark).then((r) => setSummary(r.data));
   }, [passMark]);
 
+  useEffect(() => {
+    if (tab === "questions" && id && questionStats.length === 0) {
+      statsApi.questionStats(id).then((r) => setQuestionStats(r.data)).catch(() => {});
+    }
+  }, [tab, id]);
+
   const handleExport = async (format: "csv" | "xlsx") => {
     if (!id) return;
     const res = await resultsApi.export(id, format);
@@ -47,15 +56,31 @@ export function ResultsPage() {
   return (
     <ExamLayout>
       <div style={styles.header}>
-        <div style={styles.exportBtns}>
-          <button onClick={() => handleExport("csv")} style={styles.exportBtn}>Export CSV</button>
-          <button onClick={() => handleExport("xlsx")} style={styles.exportBtn}>Export XLSX</button>
+        <div style={styles.tabs}>
+          <button
+            style={{ ...styles.tab, ...(tab === "results" ? styles.tabActive : {}) }}
+            onClick={() => setTab("results")}
+          >
+            Results
+          </button>
+          <button
+            style={{ ...styles.tab, ...(tab === "questions" ? styles.tabActive : {}) }}
+            onClick={() => setTab("questions")}
+          >
+            Question Analysis
+          </button>
         </div>
+        {tab === "results" && (
+          <div style={styles.exportBtns}>
+            <button onClick={() => handleExport("csv")} style={styles.exportBtn}>Export CSV</button>
+            <button onClick={() => handleExport("xlsx")} style={styles.exportBtn}>Export XLSX</button>
+          </div>
+        )}
       </div>
 
       {loading ? (
         <p>Loading...</p>
-      ) : (
+      ) : tab === "results" ? (
         <>
           {summary && (
             <div style={styles.summaryGrid}>
@@ -131,8 +156,62 @@ export function ResultsPage() {
             )}
           </div>
         </>
+      ) : (
+        /* Question Analysis tab */
+        <div style={styles.tableSection}>
+          <h2 style={styles.h2}>Per-Question Analysis</h2>
+          {questionStats.length === 0 ? (
+            <p style={styles.empty}>No question stats available. Process submissions first.</p>
+          ) : (
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Q#</th>
+                  <th style={styles.th}>Type</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Responses</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Correct</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Wrong</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Multiple</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Unanswered</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Correct Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {questionStats.map((q) => (
+                  <tr key={q.question_number} style={styles.tr}>
+                    <td style={{ ...styles.td, fontWeight: 700 }}>{q.question_number}</td>
+                    <td style={styles.td}>
+                      <span style={styles.typeBadge}>{q.question_type}</span>
+                    </td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>{q.total_responses}</td>
+                    <td style={{ ...styles.td, textAlign: "right", color: "#276749", fontWeight: 600 }}>{q.correct}</td>
+                    <td style={{ ...styles.td, textAlign: "right", color: "#742a2a" }}>{q.wrong}</td>
+                    <td style={{ ...styles.td, textAlign: "right", color: "#b79a62" }}>{q.multiple}</td>
+                    <td style={{ ...styles.td, textAlign: "right", color: "#718096" }}>{q.unanswered}</td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>
+                      <CorrectRateBar rate={q.correct_rate} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
     </ExamLayout>
+  );
+}
+
+function CorrectRateBar({ rate }: { rate: number }) {
+  const pct = Math.round(rate * 100);
+  const color = pct >= 70 ? "#276749" : pct >= 40 ? "#b79a62" : "#c53030";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+      <div style={{ width: 70, height: 7, background: "#e2e8f0", borderRadius: 99, overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 99 }} />
+      </div>
+      <span style={{ fontSize: 12, fontWeight: 700, color, minWidth: 36, textAlign: "right" }}>{pct}%</span>
+    </div>
   );
 }
 
@@ -147,7 +226,14 @@ function SummaryCard({ label, value, subtext }: { label: string; value: string |
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  header: { display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 24 },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
+  tabs: { display: "flex", gap: 4 },
+  tab: {
+    padding: "7px 18px", background: "transparent", border: "1px solid #d4c5a9",
+    borderRadius: 6, fontSize: 13, fontWeight: 600, color: "#718096", cursor: "pointer",
+  },
+  tabActive: { background: "#233654", color: "#fff", borderColor: "#233654" },
+  typeBadge: { fontSize: 10, fontWeight: 700, background: "#e2e8f0", color: "#4a5568", padding: "2px 7px", borderRadius: 99 },
   h2: { fontSize: 16, fontWeight: 700, color: "#2d3748", marginBottom: 16 },
   exportBtns: { display: "flex", gap: 8 },
   exportBtn: { padding: "8px 16px", background: "#edf2f7", color: "#2d3748", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 600 },

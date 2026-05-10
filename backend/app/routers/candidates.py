@@ -10,9 +10,12 @@ from sqlalchemy import or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.db.models import Candidate, BatchMembership, User
+from sqlalchemy.orm import selectinload
+
+from app.db.models import Candidate, BatchMembership, Exam, Result, Subject, Examination, User
 from app.auth.jwt import require_roles
 from app.schemas.candidate import CandidateCreate, CandidateUpdate, CandidateOut, ImportResult, ImportError
+from app.schemas.stats import CandidatePerformance, CandidateInfo, CandidatePaperResult, CandidateExaminationResult
 
 router = APIRouter()
 
@@ -320,3 +323,71 @@ async def export_candidates(
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=candidates.csv"},
         )
+
+
+# ---------------------------------------------------------------------------
+# Candidate performance (cross-examination)
+# ---------------------------------------------------------------------------
+
+@router.get("/candidates/{candidate_id}/performance", response_model=CandidatePerformance)
+async def get_candidate_performance(
+    candidate_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(_any_role),
+):
+    candidate = (await db.execute(
+        select(Candidate).where(Candidate.id == candidate_id)
+    )).scalar_one_or_none()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    # Load all results for this candidate, with full exam → subject → examination chain
+    results = (await db.execute(
+        select(Result)
+        .options(
+            selectinload(Result.exam)
+            .selectinload(Exam.subject)
+            .selectinload(Subject.examination)
+        )
+        .where(Result.candidate_id == candidate_id)
+        .order_by(Result.percentage.desc())
+    )).scalars().all()
+
+    # Group results by examination
+    by_examination: dict[str, dict] = {}
+    for r in results:
+        exam = r.exam
+        if not exam or not exam.subject or not exam.subject.examination:
+            continue
+        examination = exam.subject.examination
+        eid = examination.id
+        if eid not in by_examination:
+            by_examination[eid] = {"examination": examination, "papers": []}
+        by_examination[eid]["papers"].append(CandidatePaperResult(
+            paper_id=exam.id,
+            title=exam.title,
+            score=r.score,
+            percentage=r.percentage,
+            passed=r.percentage >= exam.pass_mark,
+            pass_mark=exam.pass_mark,
+        ))
+
+    examinations = []
+    for eid, data in by_examination.items():
+        papers = data["papers"]
+        overall = round(sum(p.percentage for p in papers) / len(papers), 2) if papers else 0.0
+        examinations.append(CandidateExaminationResult(
+            examination_id=eid,
+            title=data["examination"].title,
+            papers=papers,
+            overall_percentage=overall,
+        ))
+
+    return CandidatePerformance(
+        candidate=CandidateInfo(
+            id=candidate.id,
+            registration_number=candidate.registration_number,
+            name=candidate.name,
+        ),
+        examinations=examinations,
+    )

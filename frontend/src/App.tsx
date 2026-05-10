@@ -21,6 +21,8 @@ import { ExaminationsPage } from "./pages/ExaminationsPage";
 import { ExaminationCreatePage } from "./pages/ExaminationCreatePage";
 import { ExaminationDetailPage } from "./pages/ExaminationDetailPage";
 import { BatchDetailPage } from "./pages/BatchDetailPage";
+import { ExaminationStatsPage } from "./pages/ExaminationStatsPage";
+import { SubjectStatsPage } from "./pages/SubjectStatsPage";
 
 export function App() {
   return (
@@ -40,6 +42,8 @@ export function App() {
         <Route path="/examinations/new" element={<AuthGuard><ExaminationCreatePage /></AuthGuard>} />
         <Route path="/examinations/:eid" element={<AuthGuard><ExaminationDetailPage /></AuthGuard>} />
         <Route path="/examinations/:eid/batches/:bid" element={<AuthGuard><BatchDetailPage /></AuthGuard>} />
+        <Route path="/examinations/:eid/stats" element={<AuthGuard><ExaminationStatsPage /></AuthGuard>} />
+        <Route path="/examinations/:eid/subjects/:sid/stats" element={<AuthGuard><SubjectStatsPage /></AuthGuard>} />
         <Route path="/candidates" element={<AuthGuard><CandidatesPage /></AuthGuard>} />
         <Route path="/candidates/new" element={<AuthGuard><CandidateCreatePage /></AuthGuard>} />
         <Route path="/candidates/:id" element={<AuthGuard><CandidateDetailPage /></AuthGuard>} />

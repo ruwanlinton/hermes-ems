@@ -4,6 +4,7 @@ import { Layout } from "../components/layout/Layout";
 import { examinationsApi, type ExaminationDetail, type SubjectWithPapers } from "../api/examinations";
 import { examsApi, type Exam } from "../api/exams";
 import { batchesApi, type Batch } from "../api/batches";
+import { statsApi, type ExaminationStats } from "../api/stats";
 import { useAuth, hasRole } from "../auth/AuthContext";
 
 type Status = "draft" | "active" | "closed";
@@ -16,6 +17,7 @@ export function ExaminationDetailPage() {
 
   const [examination, setExamination] = useState<ExaminationDetail | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [examStats, setExamStats] = useState<ExaminationStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -46,12 +48,14 @@ export function ExaminationDetailPage() {
   const load = async () => {
     if (!eid) return;
     try {
-      const [examRes, batchRes] = await Promise.all([
+      const [examRes, batchRes, statsRes] = await Promise.all([
         examinationsApi.get(eid),
         batchesApi.list(eid).catch(() => ({ data: [] as Batch[] })),
+        statsApi.examinationStats(eid).catch(() => null),
       ]);
       setExamination(examRes.data);
       setBatches(batchRes.data);
+      if (statsRes) setExamStats(statsRes.data);
       setHeaderForm({
         title: examRes.data.title,
         description: examRes.data.description ?? "",
@@ -281,6 +285,42 @@ export function ExaminationDetailPage() {
       </div>
 
       {error && <div style={styles.alertErr}>{error}</div>}
+
+      {/* Stats summary strip */}
+      {examStats && (
+        <div style={styles.statsStrip}>
+          <div style={styles.statsCard}>
+            <div style={styles.statsVal}>{examStats.total_enrolled_candidates}</div>
+            <div style={styles.statsLabel}>Enrolled Candidates</div>
+          </div>
+          <div style={styles.statsCard}>
+            <div style={styles.statsVal}>{examStats.subjects.flatMap(s => s.papers).length}</div>
+            <div style={styles.statsLabel}>Papers</div>
+          </div>
+          {(() => {
+            const allPapers = examStats.subjects.flatMap(s => s.papers);
+            const totalCandidates = allPapers.reduce((s, p) => s + p.total_candidates, 0);
+            const overallPassRate = allPapers.length > 0
+              ? allPapers.reduce((s, p) => s + p.pass_rate, 0) / allPapers.length
+              : 0;
+            return (
+              <>
+                <div style={styles.statsCard}>
+                  <div style={styles.statsVal}>{totalCandidates}</div>
+                  <div style={styles.statsLabel}>Submissions</div>
+                </div>
+                <div style={{ ...styles.statsCard, borderLeft: "3px solid #b79a62" }}>
+                  <div style={{ ...styles.statsVal, color: "#b79a62" }}>{overallPassRate.toFixed(1)}%</div>
+                  <div style={styles.statsLabel}>Avg Pass Rate</div>
+                </div>
+              </>
+            );
+          })()}
+          <Link to={`/examinations/${eid}/stats`} style={styles.statsLink}>
+            Full Statistics →
+          </Link>
+        </div>
+      )}
 
       {/* Subjects & Papers */}
       <div style={styles.section}>
@@ -594,6 +634,21 @@ const styles: Record<string, React.CSSProperties> = {
   addSubjectBtn: {
     padding: "8px 18px", background: "#233654", color: "#fff",
     border: "none", borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: "pointer",
+  },
+  statsStrip: {
+    display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const,
+    background: "#fff", borderRadius: 8, padding: "14px 20px",
+    marginBottom: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.07)", border: "1px solid #e8e0d0",
+  },
+  statsCard: {
+    display: "flex", flexDirection: "column" as const, alignItems: "center",
+    padding: "0 16px", borderRight: "1px solid #e8e0d0",
+  },
+  statsVal: { fontSize: 22, fontWeight: 700, color: "#233654" },
+  statsLabel: { fontSize: 10, color: "#718096", marginTop: 2, whiteSpace: "nowrap" as const },
+  statsLink: {
+    marginLeft: "auto", fontSize: 12, fontWeight: 600,
+    color: "#ba3c3c", textDecoration: "none",
   },
   batchGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16 },
   batchCard: {

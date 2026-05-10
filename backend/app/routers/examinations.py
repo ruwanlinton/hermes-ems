@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
-from app.db.models import Examination, Subject, Exam, User
+from app.db.models import Examination, Subject, Exam, Result, Batch, BatchMembership, User
 from app.auth.jwt import require_roles
 from app.schemas.examination import (
     ExaminationCreate,
@@ -18,6 +18,7 @@ from app.schemas.examination import (
     TransitionRequest,
 )
 from app.schemas.exam import ExamOut
+from app.schemas.stats import ExaminationStats, SubjectStats, SubjectStat, PaperStat
 
 router = APIRouter()
 
@@ -328,3 +329,84 @@ async def list_papers(
         select(Exam).where(Exam.subject_id == sid).order_by(Exam.title)
     )).scalars().all()
     return rows
+
+
+# ---------------------------------------------------------------------------
+# Statistics
+# ---------------------------------------------------------------------------
+
+async def _paper_stat(paper: Exam, db: AsyncSession) -> PaperStat:
+    results = (await db.execute(
+        select(Result).where(Result.exam_id == paper.id)
+    )).scalars().all()
+    total = len(results)
+    pass_count = sum(1 for r in results if r.percentage >= paper.pass_mark)
+    return PaperStat(
+        paper_id=paper.id,
+        title=paper.title,
+        total_candidates=total,
+        pass_count=pass_count,
+        pass_rate=round(pass_count / total * 100, 2) if total > 0 else 0.0,
+        mean_percentage=round(sum(r.percentage for r in results) / total, 2) if total > 0 else 0.0,
+    )
+
+
+@router.get("/examinations/{eid}/subjects/{sid}/stats", response_model=SubjectStats)
+async def get_subject_stats(
+    eid: str,
+    sid: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(_any_role),
+):
+    await _get_examination_or_404(eid, db)
+    subject = await _get_subject_or_404(eid, sid, db)
+
+    papers = (await db.execute(
+        select(Exam).where(Exam.subject_id == sid).order_by(Exam.title)
+    )).scalars().all()
+
+    return SubjectStats(
+        subject_id=sid,
+        subject_name=subject.name,
+        examination_id=eid,
+        papers=[await _paper_stat(p, db) for p in papers],
+    )
+
+
+@router.get("/examinations/{eid}/stats", response_model=ExaminationStats)
+async def get_examination_stats(
+    eid: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(_any_role),
+):
+    examination = await _get_examination_or_404(eid, db)
+
+    subjects = (await db.execute(
+        select(Subject).where(Subject.examination_id == eid).order_by(Subject.display_order, Subject.name)
+    )).scalars().all()
+
+    subject_stats: list[SubjectStat] = []
+    for subject in subjects:
+        papers = (await db.execute(
+            select(Exam).where(Exam.subject_id == subject.id).order_by(Exam.title)
+        )).scalars().all()
+        subject_stats.append(SubjectStat(
+            subject_id=subject.id,
+            subject_name=subject.name,
+            papers=[await _paper_stat(p, db) for p in papers],
+        ))
+
+    # Total enrolled candidates (sum across all batches in this examination)
+    total_enrolled = (await db.execute(
+        select(func.count(BatchMembership.id))
+        .join(Batch, Batch.id == BatchMembership.batch_id)
+        .where(Batch.examination_id == eid)
+    )).scalar_one()
+
+    return ExaminationStats(
+        examination_id=eid,
+        title=examination.title,
+        status=examination.status,
+        total_enrolled_candidates=total_enrolled,
+        subjects=subject_stats,
+    )

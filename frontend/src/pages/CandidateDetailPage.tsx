@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Layout } from "../components/layout/Layout";
 import { candidatesApi, type Candidate } from "../api/candidates";
+import { statsApi, type CandidatePerformance } from "../api/stats";
 import { useAuth, hasRole } from "../auth/AuthContext";
 
 export function CandidateDetailPage() {
@@ -11,6 +12,7 @@ export function CandidateDetailPage() {
   const canEdit = hasRole(user, "admin", "creator");
 
   const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const [performance, setPerformance] = useState<CandidatePerformance | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -36,6 +38,7 @@ export function CandidateDetailPage() {
         mobile: res.data.mobile ?? "",
       });
       setLoading(false);
+      statsApi.candidatePerformance(id).then((r) => setPerformance(r.data)).catch(() => {});
     }).catch(() => {
       setError("Candidate not found.");
       setLoading(false);
@@ -206,9 +209,82 @@ export function CandidateDetailPage() {
           </dl>
         )}
       </div>
+
+      {/* Cross-examination performance */}
+      <div style={{ ...styles.card, marginTop: 24, maxWidth: "none" }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: "#233654", marginBottom: 16 }}>
+          Examination Performance
+        </h2>
+        {!performance ? (
+          <p style={{ color: "#a0aec0", fontSize: 14 }}>Loading performance data…</p>
+        ) : performance.examinations.length === 0 ? (
+          <p style={{ color: "#a0aec0", fontSize: 14 }}>No examination results linked to this candidate yet.</p>
+        ) : (
+          performance.examinations.map((ex) => (
+            <div key={ex.examination_id} style={pStyles.examBlock}>
+              <div style={pStyles.examHeader}>
+                <Link to={`/examinations/${ex.examination_id}`} style={pStyles.examLink}>
+                  {ex.title}
+                </Link>
+                <span style={pStyles.overallBadge}>
+                  Overall: {ex.overall_percentage.toFixed(1)}%
+                </span>
+              </div>
+              <table style={pStyles.table}>
+                <thead>
+                  <tr>
+                    <th style={pStyles.th}>Paper</th>
+                    <th style={{ ...pStyles.th, textAlign: "right" }}>Score</th>
+                    <th style={{ ...pStyles.th, textAlign: "right" }}>Percentage</th>
+                    <th style={{ ...pStyles.th, textAlign: "right" }}>Pass Mark</th>
+                    <th style={{ ...pStyles.th, textAlign: "right" }}>Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ex.papers.map((p) => (
+                    <tr key={p.paper_id} style={pStyles.tr}>
+                      <td style={pStyles.td}>
+                        <Link to={`/exams/${p.paper_id}/results`} style={pStyles.paperLink}>
+                          {p.title}
+                        </Link>
+                      </td>
+                      <td style={{ ...pStyles.td, textAlign: "right" }}>{p.score.toFixed(1)}</td>
+                      <td style={{ ...pStyles.td, textAlign: "right" }}>{p.percentage.toFixed(1)}%</td>
+                      <td style={{ ...pStyles.td, textAlign: "right" }}>{p.pass_mark}%</td>
+                      <td style={{ ...pStyles.td, textAlign: "right" }}>
+                        <span style={{ ...pStyles.badge, ...(p.passed ? pStyles.pass : pStyles.fail) }}>
+                          {p.passed ? "PASS" : "FAIL"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))
+        )}
+      </div>
     </Layout>
   );
 }
+
+const pStyles: Record<string, React.CSSProperties> = {
+  examBlock: { marginBottom: 20, border: "1px solid #e8e0d0", borderRadius: 8, overflow: "hidden" },
+  examHeader: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "12px 18px", background: "#f9f6f0", borderBottom: "1px solid #e8e0d0",
+  },
+  examLink: { fontSize: 14, fontWeight: 700, color: "#233654", textDecoration: "none" },
+  overallBadge: { fontSize: 12, fontWeight: 700, color: "#718096" },
+  table: { width: "100%", borderCollapse: "collapse" },
+  th: { padding: "9px 18px", fontSize: 11, fontWeight: 600, color: "#718096", borderBottom: "1px solid #f0ebe0", textAlign: "left" as const },
+  tr: { borderBottom: "1px solid #f7fafc" },
+  td: { padding: "10px 18px", fontSize: 13, color: "#2d3748" },
+  paperLink: { color: "#ba3c3c", textDecoration: "none", fontWeight: 600 },
+  badge: { padding: "2px 9px", borderRadius: 99, fontSize: 11, fontWeight: 700 },
+  pass: { background: "#c6f6d5", color: "#276749" },
+  fail: { background: "#fed7d7", color: "#742a2a" },
+};
 
 const styles: Record<string, React.CSSProperties> = {
   breadcrumb: { fontSize: 13, color: "#718096", marginBottom: 20 },
