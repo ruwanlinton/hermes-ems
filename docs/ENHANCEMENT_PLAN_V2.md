@@ -1,51 +1,19 @@
 # Hermes EMS — Enhancement Plan v2.0
 
-> **How to use this document:**
-> Answer the open questions in the "Design Decisions" section below, then load this file as context
-> when starting implementation. Each phase can be handed to Claude Code as a self-contained task.
+> **Status: FINALIZED — ready for implementation.**
+> All design decisions have been confirmed. Each phase is a self-contained implementation unit.
 
 ---
 
-## Design Decisions (Answer Before Implementation Starts)
+## Finalized Decisions
 
-### Decision 1 — Batch scope
-**Question:** Does a Batch belong to an **Examination** (one batch sits all papers in a sitting) or to an individual **Paper** (one batch per paper, index numbers could differ per paper)?
-
-**Recommendation:** Batch belongs to Examination — a candidate enrolls once per sitting and carries the same index number across all papers.
-
-**Your answer:**
-
----
-
-### Decision 2 — Candidate deletion
-**Question:** When a candidate is enrolled in a batch, should DELETE be blocked (hard delete with 409 error) or should candidates support soft-delete (`deleted_at` column, filtered out of normal queries)?
-
-**Recommendation:** Hard delete with 409 — keep the model simple; admins unenroll first.
-
-**Your answer:**
-
----
-
-### Decision 3 — Statistics scale
-**Question:** What is the expected maximum number of submissions per paper? Up to ~5,000 allows simple Python-level JSONB aggregation. Above that, DB-level aggregation or a cache table is needed.
-
-**Your answer:**
-
----
-
-### Decision 4 — Examination status workflow
-**Question:** Should Examinations have a status lifecycle (draft → active → closed) that locks editing of subjects/papers/batches once closed?
-
-**Your answer:**
-
----
-
-### Decision 5 — `Exam` rename to `Paper`
-**Question:** The plan defers the `exams` → `papers` table/route rename to Phase 5. Do you want it done earlier (Phase 2, breaking change) or keep it deferred?
-
-**Recommendation:** Defer to Phase 5 — keeps Phases 1–4 non-breaking.
-
-**Your answer:**
+| # | Decision | Answer |
+|---|----------|--------|
+| 1 | Batch scope | **Batch belongs to Examination** — one index number per candidate per sitting, shared across all papers |
+| 2 | Candidate deletion | **Hard delete, blocked** — 409 if candidate is enrolled in any batch; admin must unenroll first |
+| 3 | Statistics scale | **≤ 5,000 submissions/paper** — Python-level JSONB aggregation is acceptable |
+| 4 | Examination status lifecycle | **Yes, implement** — draft → active → closed with full state-transition API and edit locking |
+| 5 | `exams` → `papers` rename | **Deferred to Phase 5** — keeps Phases 1–4 non-breaking |
 
 ---
 
@@ -54,7 +22,7 @@
 | Phase | Scope | Key Deliverable |
 |-------|-------|----------------|
 | 1 | Candidates | Candidate CRUD, CSV/XLSX import/export |
-| 2 | Hierarchy | Examination → Subject → Paper model |
+| 2 | Hierarchy | Examination → Subject → Paper model + status lifecycle |
 | 3 | Batches | Candidate enrollment, index number assignment, batch-based sheet generation |
 | 4 | Statistics | Question, paper, subject, examination, candidate-level stats |
 | 5 | Cleanup | Rename `exams` → `papers` across DB, API, frontend |
@@ -171,11 +139,46 @@ UniqueConstraint: `(examination_id, name)`
 2. `CREATE TABLE subjects`
 3. `ALTER TABLE exams ADD COLUMN subject_id`
 4. Data migration (within same migration):
-   - Insert one "Legacy" Examination record
+   - Insert one "Legacy" Examination record (status = `"active"`)
    - Insert one "Legacy" Subject under it
    - `UPDATE exams SET subject_id = '<legacy_subject_id>'`
 
 No data is lost. Admins reassign existing exams to real subjects via PATCH.
+
+### Examination Status Lifecycle
+
+**States:**
+
+| Status | Meaning |
+|--------|---------|
+| `draft` | Examination is being configured; subjects, batches, and papers can be added or edited freely |
+| `active` | Examination is in progress; submissions are accepted; new subjects/batches may still be added but existing names/dates are locked |
+| `closed` | Examination is complete; all editing is locked; results are read-only |
+
+**Allowed transitions:**
+
+| From | To | Who |
+|------|----|-----|
+| `draft` | `active` | admin, creator |
+| `active` | `closed` | admin only |
+| `closed` | *(none)* | — closed is terminal |
+
+Attempting a disallowed transition returns **422 Unprocessable Entity** with a message describing the constraint.
+
+**Edit-locking rules:**
+
+| Action | `draft` | `active` | `closed` |
+|--------|---------|----------|----------|
+| Rename/edit Examination | ✓ | ✗ locked | ✗ locked |
+| Add/rename Subject | ✓ | ✗ locked | ✗ locked |
+| Delete Subject | ✓ | ✗ locked | ✗ locked |
+| Add/rename Batch | ✓ | ✓ | ✗ locked |
+| Enroll/unenroll candidates | ✓ | ✓ | ✗ locked |
+| Assign Paper to Subject | ✓ | ✓ | ✗ locked |
+| Upload Submissions | ✓ | ✓ | ✗ locked |
+| View Results / Export | ✓ | ✓ | ✓ |
+
+**Backend enforcement:** each mutating endpoint checks `examination.status` before applying changes and returns 409 with `"Examination is {status}: this action is not permitted."` if locked.
 
 ### Backend
 
@@ -186,6 +189,8 @@ No data is lost. Admins reassign existing exams to real subjects via PATCH.
 **Pydantic schemas:**
 ```
 ExaminationCreate:    title, description?, exam_date?, status?
+ExaminationUpdate:    title?, description?, exam_date?  (status NOT updatable via PATCH — use transition endpoint)
+TransitionRequest:    target_status: Literal["active", "closed"]
 ExaminationOut:       id, title, description, exam_date, status, created_at, updated_at
 SubjectCreate:        name, display_order?
 SubjectOut:           id, examination_id, name, display_order
@@ -195,18 +200,19 @@ ExaminationDetail:    ExaminationOut + subjects: List[SubjectOut]
 
 **API endpoints:**
 
-| Method | Path | Notes |
-|--------|------|-------|
-| GET | `/examinations` | list all |
-| POST | `/examinations` | create |
-| GET | `/examinations/{eid}` | detail with subjects embedded |
-| PATCH | `/examinations/{eid}` | update |
-| DELETE | `/examinations/{eid}` | block if has subjects |
-| GET | `/examinations/{eid}/subjects` | list |
-| POST | `/examinations/{eid}/subjects` | add subject |
-| PATCH | `/examinations/{eid}/subjects/{sid}` | rename / reorder |
-| DELETE | `/examinations/{eid}/subjects/{sid}` | block if has papers |
-| GET | `/examinations/{eid}/subjects/{sid}/papers` | list papers (exams) in subject |
+| Method | Path | Roles | Notes |
+|--------|------|-------|-------|
+| GET | `/examinations` | all | list all |
+| POST | `/examinations` | creator+ | create (status defaults to `draft`) |
+| GET | `/examinations/{eid}` | all | detail with subjects embedded |
+| PATCH | `/examinations/{eid}` | creator+ | update title/description/exam_date; 409 if `active` or `closed` |
+| DELETE | `/examinations/{eid}` | admin | block if has subjects; must be `draft` |
+| POST | `/examinations/{eid}/transition` | creator+ (active), admin (closed) | `{target_status}` — enforces allowed-transition table |
+| GET | `/examinations/{eid}/subjects` | all | list |
+| POST | `/examinations/{eid}/subjects` | creator+ | add subject; 409 if not `draft` |
+| PATCH | `/examinations/{eid}/subjects/{sid}` | creator+ | rename/reorder; 409 if not `draft` |
+| DELETE | `/examinations/{eid}/subjects/{sid}` | creator+ | block if has papers; 409 if not `draft` |
+| GET | `/examinations/{eid}/subjects/{sid}/papers` | all | list papers (exams) in subject |
 
 All existing `/exams/*` endpoints unchanged.
 
@@ -214,9 +220,22 @@ All existing `/exams/*` endpoints unchanged.
 
 **New files:**
 - `frontend/src/api/examinations.ts`
-- `frontend/src/pages/ExaminationsPage.tsx` — list with subject/paper counts
+- `frontend/src/pages/ExaminationsPage.tsx` — list with subject/paper counts and status badge
 - `frontend/src/pages/ExaminationCreatePage.tsx` — form with initial subject input
-- `frontend/src/pages/ExaminationDetailPage.tsx` — tree view: examination → subjects → papers
+- `frontend/src/pages/ExaminationDetailPage.tsx` — tree view: examination → subjects → papers + status controls
+
+**Status badge colours:**
+
+| Status | Colour |
+|--------|--------|
+| `draft` | Grey |
+| `active` | Green |
+| `closed` | Navy |
+
+**Transition controls (ExaminationDetailPage):**
+- `draft` → show **"Activate"** button (creator+); confirm dialog: "This will lock subject and date editing."
+- `active` → show **"Close Examination"** button (admin only); confirm dialog: "This will lock all editing permanently."
+- `closed` → no transition button; display read-only banner: "This examination is closed."
 
 **Navbar:** Add "Examinations" link (keep "Exams" for now as direct paper access).
 
@@ -290,14 +309,14 @@ ImportResult:       enrolled: int, errors: [{row, message}]
 | Method | Path | Notes |
 |--------|------|-------|
 | GET | `/examinations/{eid}/batches` | |
-| POST | `/examinations/{eid}/batches` | |
+| POST | `/examinations/{eid}/batches` | 409 if examination is `closed` |
 | GET | `/examinations/{eid}/batches/{bid}` | includes member count |
-| PATCH | `/examinations/{eid}/batches/{bid}` | |
-| DELETE | `/examinations/{eid}/batches/{bid}` | block if has members |
+| PATCH | `/examinations/{eid}/batches/{bid}` | 409 if `closed` |
+| DELETE | `/examinations/{eid}/batches/{bid}` | block if has members; 409 if `closed` |
 | GET | `/examinations/{eid}/batches/{bid}/members` | paginated, includes candidate name |
-| POST | `/examinations/{eid}/batches/{bid}/members` | enroll single: `{candidate_id, index_number}` |
-| POST | `/examinations/{eid}/batches/{bid}/members/import` | CSV cols: `registration_number`, `index_number` |
-| DELETE | `/examinations/{eid}/batches/{bid}/members/{mid}` | unenroll |
+| POST | `/examinations/{eid}/batches/{bid}/members` | enroll single: `{candidate_id, index_number}`; 409 if `closed` |
+| POST | `/examinations/{eid}/batches/{bid}/members/import` | CSV cols: `registration_number`, `index_number`; 409 if `closed` |
+| DELETE | `/examinations/{eid}/batches/{bid}/members/{mid}` | unenroll; 409 if `closed` |
 | GET | `/examinations/{eid}/batches/{bid}/members/export` | CSV/XLSX |
 | POST | `/exams/{exam_id}/results/link-candidates` | admin reconciliation: match existing results to candidates by index_number |
 
@@ -406,6 +425,7 @@ This is a mechanical change touching ~15 files. Do in one PR with a short mainte
 | OMR pipeline | Completely unchanged — reads `index_number` from QR/bubble, grades as before |
 | Sheet generation | Existing CSV flow preserved; batch-based flow is additive |
 | Export | Phase 4 adds `candidate_name` + `registration_number` columns to CSV/XLSX export |
+| Legacy Examination status | "Legacy" examination created by Phase 2 migration is seeded with status `active` so existing papers remain accessible and submittable without admin action |
 
 ---
 
@@ -413,12 +433,12 @@ This is a mechanical change touching ~15 files. Do in one PR with a short mainte
 
 | Risk | Severity | Mitigation |
 |------|----------|-----------|
-| Batch scope decision (per-exam vs per-paper) affects Phase 3 schema fundamentally | High | Answer Decision 1 before Phase 3 starts |
-| `question_scores` JSONB iteration is O(n) in Python — slow for large result sets | Medium | Acceptable to ~5k; add `question_result_details` table if needed |
-| `exams` → `papers` rename touches ~15 files simultaneously | Medium | Defer to Phase 5; do in one coordinated PR |
+| `question_scores` JSONB iteration is O(n) in Python — slow for large result sets | Medium | Acceptable to ~5k (confirmed); add `question_result_details` table if volumes grow |
+| `exams` → `papers` rename touches ~15 files simultaneously | Medium | Deferred to Phase 5; do in one coordinated PR |
 | Candidate hard-delete blocked by FK if enrolled | Low | Return 409 with clear message; admin unenrolls first |
 | Import upsert on `registration_number` silently overwrites names | Low | Document clearly in UI |
 | Stats endpoints do Python-level JSONB aggregation | Medium | Revisit with DB jsonb operators if slow |
+| Transition to `closed` is irreversible | Low | Confirmation dialog required in UI; only admin can close |
 
 ---
 
