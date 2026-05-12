@@ -5,15 +5,20 @@ import { examsApi } from "../api/exams";
 import { resultsApi, type Result, type ResultSummary } from "../api/results";
 import { statsApi, type QuestionStat } from "../api/stats";
 import { ScoreChart } from "../components/results/ScoreChart";
+import { useAuth, hasRole } from "../auth/AuthContext";
 
 export function ResultsPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const canLink = hasRole(user, "admin", "creator");
   const [tab, setTab] = useState<"results" | "questions">("results");
   const [results, setResults] = useState<Result[]>([]);
   const [summary, setSummary] = useState<ResultSummary | null>(null);
   const [questionStats, setQuestionStats] = useState<QuestionStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [passMark, setPassMark] = useState<number | null>(null);
+  const [linking, setLinking] = useState(false);
+  const [linkResult, setLinkResult] = useState<{ linked: number; skipped: { index_number: string; reason: string }[] } | null>(null);
 
   const loadData = async () => {
     if (!id) return;
@@ -39,6 +44,21 @@ export function ResultsPage() {
       statsApi.questionStats(id).then((r) => setQuestionStats(r.data)).catch(() => {});
     }
   }, [tab, id]);
+
+  const handleLinkCandidates = async () => {
+    if (!id) return;
+    setLinking(true);
+    setLinkResult(null);
+    try {
+      const res = await resultsApi.linkCandidates(id);
+      setLinkResult(res.data);
+      if (res.data.linked > 0) loadData(); // refresh results list to show candidate names
+    } catch {
+      setLinkResult({ linked: 0, skipped: [{ index_number: "—", reason: "Request failed. Check console." }] });
+    } finally {
+      setLinking(false);
+    }
+  };
 
   const handleExport = async (format: "csv" | "xlsx") => {
     if (!id) return;
@@ -77,6 +97,46 @@ export function ResultsPage() {
           </div>
         )}
       </div>
+
+      {/* Link candidates banner */}
+      {canLink && (
+        <div style={styles.linkRow}>
+          <div style={styles.linkDesc}>
+            <strong>Link Candidates to Results</strong>
+            <span style={{ color: "#718096", fontSize: 12, marginLeft: 8 }}>
+              Matches batch members' index numbers to unlinked scanned results.
+            </span>
+          </div>
+          <button
+            onClick={handleLinkCandidates}
+            disabled={linking}
+            style={styles.linkBtn}
+          >
+            {linking ? "Linking…" : "Link Candidates"}
+          </button>
+        </div>
+      )}
+      {linkResult && (
+        <div style={{ ...styles.linkBanner, ...(linkResult.linked > 0 ? styles.linkBannerSuccess : styles.linkBannerInfo) }}>
+          <span>
+            <strong>{linkResult.linked}</strong> result{linkResult.linked !== 1 ? "s" : ""} linked to candidates.
+            {linkResult.skipped.length > 0 && (
+              <> <strong>{linkResult.skipped.length}</strong> could not be matched.</>
+            )}
+          </span>
+          <button onClick={() => setLinkResult(null)} style={styles.dismissBtn}>✕</button>
+          {linkResult.skipped.length > 0 && (
+            <div style={styles.skippedList}>
+              {linkResult.skipped.map((s, i) => (
+                <div key={i} style={styles.skippedRow}>
+                  <code style={styles.indexCode}>{s.index_number}</code>
+                  <span style={{ color: "#718096", fontSize: 12 }}>{s.reason}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <p>Loading...</p>
@@ -234,6 +294,31 @@ const styles: Record<string, React.CSSProperties> = {
   },
   tabActive: { background: "#233654", color: "#fff", borderColor: "#233654" },
   typeBadge: { fontSize: 10, fontWeight: 700, background: "#e2e8f0", color: "#4a5568", padding: "2px 7px", borderRadius: 99 },
+  linkRow: {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    background: "#fff", borderRadius: 8, padding: "12px 18px",
+    marginBottom: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
+    border: "1px solid #e8e0d0",
+  },
+  linkDesc: { display: "flex", alignItems: "center", fontSize: 13, color: "#233654" },
+  linkBtn: {
+    padding: "7px 18px", background: "#233654", color: "#fff",
+    border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer",
+  },
+  linkBanner: {
+    borderRadius: 8, padding: "12px 16px", marginBottom: 12, fontSize: 13,
+    display: "flex", flexDirection: "column" as const, gap: 8,
+    position: "relative" as const,
+  },
+  linkBannerSuccess: { background: "#f0fff4", border: "1px solid #9ae6b4", color: "#276749" },
+  linkBannerInfo: { background: "#fffbeb", border: "1px solid #f6d860", color: "#744210" },
+  dismissBtn: {
+    position: "absolute" as const, top: 10, right: 12,
+    background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#a0aec0",
+  },
+  skippedList: { display: "flex", flexDirection: "column" as const, gap: 4, marginTop: 4 },
+  skippedRow: { display: "flex", alignItems: "center", gap: 10 },
+  indexCode: { fontSize: 12, background: "#e2e8f0", padding: "1px 6px", borderRadius: 4, fontFamily: "monospace" },
   h2: { fontSize: 16, fontWeight: 700, color: "#2d3748", marginBottom: 16 },
   exportBtns: { display: "flex", gap: 8 },
   exportBtn: { padding: "8px 16px", background: "#edf2f7", color: "#2d3748", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 600 },

@@ -295,7 +295,7 @@ async def get_question_stats(
 async def link_candidates(
     exam_id: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles("admin")),
+    _: User = Depends(require_roles("admin", "creator")),
 ):
     """Match existing unlinked results to candidates via batch membership index numbers.
 

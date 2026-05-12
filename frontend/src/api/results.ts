@@ -56,4 +56,9 @@ export const resultsApi = {
       params: { format },
       responseType: "blob",
     }),
+
+  linkCandidates: (examId: string) =>
+    apiClient.post<{ linked: number; skipped: { index_number: string; reason: string }[] }>(
+      `/exams/${examId}/results/link-candidates`
+    ),
 };

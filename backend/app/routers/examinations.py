@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
 from app.db.models import Examination, Subject, Exam, Result, Batch, BatchMembership, User
+from sqlalchemy.orm import selectinload
 from app.auth.jwt import require_roles
 from app.schemas.examination import (
     ExaminationCreate,
@@ -410,3 +411,70 @@ async def get_examination_stats(
         total_enrolled_candidates=total_enrolled,
         subjects=subject_stats,
     )
+
+
+# ---------------------------------------------------------------------------
+# Candidate reconciliation — link batch members to existing scanned results
+# ---------------------------------------------------------------------------
+
+@router.post("/examinations/{eid}/results/link-candidates")
+async def link_examination_candidates(
+    eid: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(_creator_plus),
+):
+    """
+    For every paper in this examination, match unlinked Result rows to
+    BatchMembership rows by index_number.
+
+    A result is linked when exactly one BatchMembership in any batch of
+    this examination shares the same index_number.  Zero or multiple
+    matches are left unlinked and returned in the report.
+    """
+    await _get_examination_or_404(eid, db)
+
+    # All papers under subjects of this examination
+    subjects = (await db.execute(
+        select(Subject).where(Subject.examination_id == eid)
+    )).scalars().all()
+
+    linked_total = 0
+    skipped: list[dict] = []
+
+    for subject in subjects:
+        papers = (await db.execute(
+            select(Exam).where(Exam.subject_id == subject.id)
+        )).scalars().all()
+
+        for paper in papers:
+            unlinked = (await db.execute(
+                select(Result).where(
+                    Result.exam_id == paper.id,
+                    Result.candidate_id.is_(None),
+                )
+            )).scalars().all()
+
+            for result in unlinked:
+                matches = (await db.execute(
+                    select(BatchMembership)
+                    .join(Batch, Batch.id == BatchMembership.batch_id)
+                    .where(
+                        Batch.examination_id == eid,
+                        BatchMembership.index_number == result.index_number,
+                    )
+                )).scalars().all()
+
+                if len(matches) == 1:
+                    result.candidate_id = matches[0].candidate_id
+                    result.batch_membership_id = matches[0].id
+                    linked_total += 1
+                else:
+                    skipped.append({
+                        "paper": paper.title,
+                        "index_number": result.index_number,
+                        "reason": "no match found" if len(matches) == 0
+                                  else f"{len(matches)} candidates share this index number",
+                    })
+
+    await db.commit()
+    return {"linked": linked_total, "skipped": skipped}

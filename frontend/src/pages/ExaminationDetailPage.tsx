@@ -26,6 +26,13 @@ export function ExaminationDetailPage() {
   const [creatingBatch, setCreatingBatch] = useState(false);
   const [batchError, setBatchError] = useState("");
 
+  // Reconciliation
+  const [linking, setLinking] = useState(false);
+  const [linkResult, setLinkResult] = useState<{
+    linked: number;
+    skipped: { paper: string; index_number: string; reason: string }[];
+  } | null>(null);
+
   // Edit examination header
   const [editingHeader, setEditingHeader] = useState(false);
   const [headerForm, setHeaderForm] = useState({ title: "", description: "", exam_date: "" });
@@ -171,6 +178,20 @@ export function ExaminationDetailPage() {
       load();
     } catch (err: any) {
       alert(err?.response?.data?.detail || "Remove failed.");
+    }
+  };
+
+  const handleLinkCandidates = async () => {
+    if (!eid) return;
+    setLinking(true);
+    setLinkResult(null);
+    try {
+      const res = await examinationsApi.linkCandidates(eid);
+      setLinkResult(res.data);
+    } catch (err: any) {
+      setBatchError(err?.response?.data?.detail || "Reconciliation failed.");
+    } finally {
+      setLinking(false);
     }
   };
 
@@ -412,6 +433,59 @@ export function ExaminationDetailPage() {
             {batchError && <span style={{ color: "#c53030", fontSize: 12 }}>{batchError}</span>}
           </form>
         )}
+
+        {/* Candidate reconciliation */}
+        <div style={styles.reconcileBox}>
+          <div style={styles.reconcileHeader}>
+            <div>
+              <div style={styles.reconcileTitle}>Link Candidates to Scanned Results</div>
+              <div style={styles.reconcileDesc}>
+                Matches each batch member's index number against unlinked scanned results
+                across all papers in this examination. Run this after enrolling candidates
+                whose sheets have already been processed.
+              </div>
+            </div>
+            <button
+              onClick={handleLinkCandidates}
+              disabled={linking}
+              style={styles.reconcileBtn}
+            >
+              {linking ? "Linking…" : "Reconcile Now"}
+            </button>
+          </div>
+
+          {linkResult && (
+            <div style={{
+              ...styles.linkBanner,
+              ...(linkResult.linked > 0 ? styles.linkBannerSuccess : styles.linkBannerInfo),
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <span style={{ fontSize: 13 }}>
+                  <strong>{linkResult.linked}</strong> result{linkResult.linked !== 1 ? "s" : ""} linked.
+                  {linkResult.skipped.length > 0 && (
+                    <> <strong>{linkResult.skipped.length}</strong> unmatched.</>
+                  )}
+                  {linkResult.linked === 0 && linkResult.skipped.length === 0 && (
+                    <> All results already linked — nothing to do.</>
+                  )}
+                </span>
+                <button onClick={() => setLinkResult(null)} style={styles.dismissBtn}>✕</button>
+              </div>
+              {linkResult.skipped.length > 0 && (
+                <div style={styles.skippedTable}>
+                  <div style={styles.skippedHead}>Paper · Index Number · Reason</div>
+                  {linkResult.skipped.map((s, i) => (
+                    <div key={i} style={styles.skippedRow}>
+                      <span style={{ color: "#4a5568", fontSize: 12 }}>{s.paper}</span>
+                      <code style={styles.indexCode}>{s.index_number}</code>
+                      <span style={{ color: "#718096", fontSize: 12 }}>{s.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </Layout>
   );
@@ -659,6 +733,28 @@ const styles: Record<string, React.CSSProperties> = {
   },
   batchName: { fontSize: 15, fontWeight: 700, color: "#233654" },
   batchCount: { fontSize: 12, color: "#718096" },
+  reconcileBox: {
+    marginTop: 20, border: "1px solid #e8e0d0", borderRadius: 8,
+    padding: "16px 18px", background: "#fafaf8",
+  },
+  reconcileHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 },
+  reconcileTitle: { fontSize: 13, fontWeight: 700, color: "#233654", marginBottom: 4 },
+  reconcileDesc: { fontSize: 12, color: "#718096", lineHeight: 1.5, maxWidth: 480 },
+  reconcileBtn: {
+    flexShrink: 0, padding: "8px 20px", background: "#233654", color: "#fff",
+    border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer",
+  },
+  linkBanner: {
+    marginTop: 14, borderRadius: 6, padding: "12px 14px", fontSize: 13,
+    display: "flex", flexDirection: "column" as const, gap: 8,
+  },
+  linkBannerSuccess: { background: "#f0fff4", border: "1px solid #9ae6b4", color: "#276749" },
+  linkBannerInfo: { background: "#fffbeb", border: "1px solid #f6d860", color: "#744210" },
+  dismissBtn: { background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#a0aec0", padding: 0 },
+  skippedTable: { display: "flex", flexDirection: "column" as const, gap: 4 },
+  skippedHead: { fontSize: 10, fontWeight: 700, color: "#a0aec0", textTransform: "uppercase" as const, letterSpacing: "0.05em", marginBottom: 2 },
+  skippedRow: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
+  indexCode: { fontSize: 12, background: "#e2e8f0", padding: "1px 6px", borderRadius: 4, fontFamily: "monospace" },
 };
 
 // SubjectBlock styles

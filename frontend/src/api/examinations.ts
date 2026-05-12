@@ -70,4 +70,10 @@ export const examinationsApi = {
 
   listPapers: (eid: string, sid: string) =>
     apiClient.get<Exam[]>(`/examinations/${eid}/subjects/${sid}/papers`),
+
+  linkCandidates: (eid: string) =>
+    apiClient.post<{
+      linked: number;
+      skipped: { paper: string; index_number: string; reason: string }[];
+    }>(`/examinations/${eid}/results/link-candidates`),
 };
